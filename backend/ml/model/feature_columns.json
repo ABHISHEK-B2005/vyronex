@@ -1,0 +1,9 @@
+[
+  "knee_angle",
+  "hip_angle",
+  "torso_angle",
+  "knee_alignment",
+  "symmetry",
+  "movement_speed",
+  "rep_duration"
+]
