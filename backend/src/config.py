@@ -112,6 +112,25 @@ MODEL_COLUMNS_PATH = "ml/model/feature_columns.json"
 # --------------------------------------------------------------------------
 ML_LABELS = ["SAFE", "MODERATE_RISK", "HIGH_RISK"]
 
+# --------------------------------------------------------------------------
+# Rep Classification & Defect mapping
+# --------------------------------------------------------------------------
+REP_FORM_SCORE_CORRECT_MIN = 70.0
+
+DEFECT_BODY_AREA_MAP: Dict[str, str] = {
+    "knee_alignment": "knee",
+    "knee_depth": "knee, hip",
+    "back_posture": "lower_back",
+    "symmetry": "hip",
+    "movement_control": "full_chain",
+    "elbow flare (push-up)": "shoulder",
+    "elbow flare": "shoulder",
+    "elbow_flare": "shoulder",
+    "landing (long jump)": "ankle, knee",
+    "landing": "ankle, knee",
+    "landing_mechanics": "ankle, knee",
+}
+
 FEATURE_COLUMNS = [
     "knee_angle",
     "hip_angle",

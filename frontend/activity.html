@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <title>Activity | VYRONEX</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/auth.js"></script>
+  <script type="module" src="assets/live.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="gym.html">VYRONEX</a>
+    <button class="text-button" type="button" data-logout>Logout</button>
+  </header>
+  <main class="dashboard-layout activity-page" data-activity-page hidden>
+    <section class="dashboard-card" data-select-activity hidden>
+      <span class="eyebrow">Activity selection</span>
+      <h1>Select an Activity First</h1>
+      <p class="dashboard-copy">Choose an activity from your training dashboard to continue.</p>
+      <div class="dashboard-actions">
+        <a class="button-link" href="gym.html">Gym workouts</a>
+        <a class="header-link" href="athlete.html">Athletics events</a>
+      </div>
+    </section>
+    <section class="dashboard-card" data-selected-activity hidden>
+      <span class="eyebrow" data-activity-category></span>
+      <h1 data-activity-label></h1>
+      <p class="dashboard-copy" data-activity-instructions></p>
+      <h2>Session metrics</h2>
+      <ul class="metric-list" data-activity-metrics></ul>
+      <section class="live-panel" data-live-panel hidden aria-labelledby="live-title">
+        <div class="live-heading">
+          <div>
+            <span class="eyebrow">Live camera coaching</span>
+            <h2 id="live-title">Squat session</h2>
+          </div>
+          <span class="live-connection" data-live-connection role="status">Ready</span>
+        </div>
+        <div class="camera-frame" data-camera-frame>
+          <video data-camera autoplay muted playsinline></video>
+          <canvas data-skeleton aria-label="Live pose skeleton overlay"></canvas>
+          <p class="camera-hint" data-camera-hint hidden></p>
+        </div>
+        <div class="live-metrics">
+          <div class="rep-counter">
+            <span>Reps</span>
+            <strong data-rep-count>0</strong>
+          </div>
+          <div class="live-phase">
+            <span>Phase</span>
+            <strong data-phase>Standing</strong>
+          </div>
+          <div class="live-risk" data-risk="LOW">
+            <div class="live-risk-heading">
+              <span>Movement risk</span>
+              <strong data-risk-label>LOW</strong>
+            </div>
+            <progress data-risk-meter max="100" value="0" aria-label="Movement risk score"></progress>
+          </div>
+        </div>
+        <p class="live-cue" data-live-cue aria-live="polite">Stand tall to begin your squat.</p>
+        <div class="live-controls">
+          <label class="voice-option">
+            <input type="checkbox" data-voice-cues>
+            Speak new cues
+          </label>
+          <button type="button" data-start-live>Start camera</button>
+          <button class="text-button" type="button" data-end-live disabled>End session</button>
+        </div>
+        <p class="form-error" data-live-error role="alert" aria-live="polite" hidden></p>
+        <p class="dashboard-copy" data-session-summary hidden></p>
+      </section>
+      <a class="header-link" data-dashboard-link href="gym.html">Back to dashboard</a>
+    </section>
+  </main>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+</body>
+</html>

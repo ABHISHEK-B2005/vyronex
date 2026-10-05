@@ -151,7 +151,11 @@ class AnalysisPipeline:
     def reset(self) -> None:
         self.squat_detector.reset()
 
-    def process_frame(self, landmarks: Optional[BodyLandmarks]) -> FrameStatus:
+    def process_frame(
+        self,
+        landmarks: Optional[BodyLandmarks],
+        timestamp: Optional[float] = None,
+    ) -> FrameStatus:
         if landmarks is None:
             return FrameStatus(
                 landmarks_ok=False,
@@ -160,7 +164,7 @@ class AnalysisPipeline:
                 message="No person detected in frame.",
             )
 
-        sample = build_frame_sample(landmarks)
+        sample = build_frame_sample(landmarks, timestamp)
         if sample is None:
             return FrameStatus(
                 landmarks_ok=False,

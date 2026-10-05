@@ -17,9 +17,10 @@ from __future__ import annotations
 
 import time
 import uuid
+from contextlib import asynccontextmanager
 from typing import Dict, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
@@ -29,8 +30,34 @@ from src.session_manager import SessionManager
 from src.demo_mode import build_demo_sequence
 from src.ring_session import RingReading, RingSessionManager
 from src.config import DISCLAIMER
+from core.database import close_mongo_connection, connect_to_mongo
+from core.deps import get_current_user
+from routes.auth import router as auth_router
+from routes.athlete import router as athlete_router
+from routes.gym import router as gym_router
+from routes.ws import router as live_router
+from services.session_service import (
+    create_session,
+    finish_session,
+    get_session_summary,
+    record_completed_rep,
+)
 
-app = FastAPI(title="VYRONEX Backend", version="0.2.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await connect_to_mongo(app)
+    try:
+        yield
+    finally:
+        await close_mongo_connection(app)
+
+
+app = FastAPI(title="VYRONEX Backend", version="0.2.0", lifespan=lifespan)
+app.include_router(auth_router)
+app.include_router(gym_router)
+app.include_router(athlete_router)
+app.include_router(live_router)
 
 # Wide-open CORS: this is a local prototype meant to be hit from a
 # frontend served on a different origin/port (e.g. a local static file
@@ -186,26 +213,46 @@ def build_checklist(form_scores, features) -> list:
 # Routes
 # ---------------------------------------------------------------------
 @app.get("/api/health")
-def health():
-    return {"status": "ok", "disclaimer": DISCLAIMER.short}
+async def health(request: Request):
+    try:
+        await request.app.state.db.command("ping")
+    except Exception as exc:
+        raise HTTPException(503, "MongoDB is unavailable") from exc
+    return {"status": "ok", "db": "connected"}
 
 
 @app.post("/api/session/start")
-def start_session(body: StartSessionIn):
-    session_id = uuid.uuid4().hex[:12]
+async def start_session(
+    body: StartSessionIn,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
     try:
         pipeline = AnalysisPipeline(risk_mode=body.risk_mode)
     except Exception as exc:  # e.g. ML mode requested but no trained model
         raise HTTPException(400, f"Could not start pipeline: {exc}")
+    user_id = str(current_user["_id"])
+    try:
+        session_id = await create_session(request.app.state.database, user_id, body.exercise)
+    except Exception as exc:
+        raise HTTPException(503, f"Could not create session record: {exc}") from exc
     manager = SessionManager(exercise_name=body.exercise)
-    _sessions[session_id] = {"pipeline": pipeline, "manager": manager}
+    _sessions[session_id] = {
+        "pipeline": pipeline,
+        "manager": manager,
+        "user_id": user_id,
+    }
     return {"session_id": session_id, "exercise": body.exercise, "risk_mode": body.risk_mode}
 
 
 @app.post("/api/frame")
-def process_frame(body: FrameIn):
+async def process_frame(
+    body: FrameIn,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
     sess = _sessions.get(body.session_id)
-    if not sess:
+    if not sess or sess["user_id"] != str(current_user["_id"]):
         raise HTTPException(404, "Unknown session_id — call /api/session/start first.")
 
     points = {
@@ -231,25 +278,56 @@ def process_frame(body: FrameIn):
             rr.rep.rep_number, rr.form_scores, rr.risk_result, rr.feedback
         )
         result["completed_rep"] = _rep_result_to_dict(rr)
+        await record_completed_rep(
+            request.app.state.database,
+            sess["user_id"],
+            body.session_id,
+            sess["manager"].start_time,
+            result["completed_rep"],
+        )
 
     return result
 
 
 @app.post("/api/session/{session_id}/end")
-def end_session(session_id: str):
+async def end_session(
+    session_id: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = str(current_user["_id"])
     sess = _sessions.pop(session_id, None)
-    if not sess:
+    if sess and sess["user_id"] == user_id:
+        sess["manager"].end_session()
+        summary = sess["manager"].summary()
+        await finish_session(request.app.state.database, user_id, session_id, summary)
+        return summary
+
+    session = await request.app.state.database.sessions.find_one({"_id": session_id, "user_id": user_id})
+    if not session:
         raise HTTPException(404, "Unknown session_id")
-    sess["manager"].end_session()
-    return sess["manager"].summary()
+
+    summary = await get_session_summary(request.app.state.database, user_id, session_id)
+    await finish_session(request.app.state.database, user_id, session_id, summary)
+    return summary or {}
 
 
 @app.get("/api/session/{session_id}/summary")
-def get_summary(session_id: str):
+async def get_summary(
+    session_id: str,
+    request: Request,
+    current_user: dict = Depends(get_current_user),
+):
+    user_id = str(current_user["_id"])
     sess = _sessions.get(session_id)
-    if not sess:
-        raise HTTPException(404, "Unknown session_id")
-    return sess["manager"].summary()
+    if sess and sess.get("user_id") == user_id:
+        return sess["manager"].summary()
+
+    db_summary = await get_session_summary(request.app.state.database, user_id, session_id)
+    if db_summary is not None:
+        return db_summary
+
+    raise HTTPException(404, "Unknown session_id")
 
 
 @app.get("/api/demo/run")

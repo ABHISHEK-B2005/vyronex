@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <title>Athletics | VYRONEX</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/auth.js"></script>
+  <script type="module" src="assets/dashboard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="athlete.html">VYRONEX</a>
+    <nav class="dashboard-nav" aria-label="Main navigation">
+      <span class="user-name" data-user-name></span>
+      <span class="role-badge" data-role-badge>Athlete</span>
+      <a class="header-link" href="#last-session">History</a>
+      <a class="header-link" href="#activities">Coach</a>
+      <button class="text-button" type="button" data-logout>Logout</button>
+    </nav>
+  </header>
+  <main class="dashboard-layout role-dashboard" data-dashboard="athlete" hidden>
+    <section class="dashboard-intro">
+      <span class="eyebrow">Athletics performance</span>
+      <h1>Choose your event<span class="accent-dot">.</span></h1>
+      <p class="dashboard-copy">Train your technique, control, and performance across your events.</p>
+      <p class="form-error" data-auth-error role="alert" aria-live="polite" hidden></p>
+      <p class="form-error" data-dashboard-error role="alert" aria-live="polite" hidden></p>
+    </section>
+    <section class="dashboard-summary" id="last-session" aria-labelledby="last-session-title">
+      <div>
+        <span class="eyebrow">Your progress</span>
+        <h2 id="last-session-title">Last session</h2>
+        <p class="dashboard-copy">Session history will appear here when available.</p>
+      </div>
+      <span class="summary-empty" aria-hidden="true">—</span>
+    </section>
+    <section class="quick-stats" data-quick-stats aria-label="Quick stats"></section>
+    <section class="activity-section" id="activities" aria-labelledby="activity-title">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">Performance library</span>
+          <h2 id="activity-title">Athletics events</h2>
+        </div>
+      </div>
+      <div class="activity-grid" data-activities></div>
+    </section>
+  </main>
+</body>
+</html>

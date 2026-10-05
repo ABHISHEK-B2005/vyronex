@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <title>Log in | VYRONEX</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <script type="module" src="assets/auth.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="login.html" aria-label="VYRONEX home">VYRONEX</a>
+    <a class="header-link" href="signup.html">New here? Create an account</a>
+  </header>
+  <main class="auth-layout">
+    <section class="auth-intro">
+      <span class="eyebrow">Welcome back</span>
+      <h1>Pick up where you left off.</h1>
+      <p>Log in to continue your training and review your movement insights.</p>
+    </section>
+    <section class="auth-card" aria-labelledby="login-title">
+      <h2 id="login-title">Log in</h2>
+      <p class="form-note">Enter the email and password linked to your account.</p>
+      <form id="login-form">
+        <div class="field">
+          <label for="email">Email</label>
+          <input id="email" name="email" type="email" autocomplete="email" required maxlength="254">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+        </div>
+        <p class="form-error" data-form-error role="alert" aria-live="polite" hidden></p>
+        <button type="submit">Log in</button>
+      </form>
+      <p class="form-footer">Need an account? <a href="signup.html">Sign up</a></p>
+    </section>
+  </main>
+</body>
+</html>
