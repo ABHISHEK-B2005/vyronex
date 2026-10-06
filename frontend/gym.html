@@ -3,49 +3,126 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10120f">
-  <title>Gym | VYRONEX</title>
-  <link rel="stylesheet" href="assets/style.css">
-  <script type="module" src="assets/auth.js"></script>
-  <script type="module" src="assets/dashboard.js"></script>
+  <title>Gym & Home Workout Dashboard | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="gym.html">VYRONEX</a>
-    <nav class="dashboard-nav" aria-label="Main navigation">
-      <span class="user-name" data-user-name></span>
-      <span class="role-badge" data-role-badge>Gym</span>
-      <a class="header-link" href="#last-session">History</a>
-      <a class="header-link" href="#activities">Coach</a>
-      <button class="text-button" type="button" data-logout>Logout</button>
-    </nav>
-  </header>
-  <main class="dashboard-layout role-dashboard" data-dashboard="gym" hidden>
-    <section class="dashboard-intro">
-      <span class="eyebrow">Gym training</span>
-      <h1>Choose your workout<span class="accent-dot">.</span></h1>
-      <p class="dashboard-copy">Build strength and control with a session tailored to your training.</p>
-      <p class="form-error" data-auth-error role="alert" aria-live="polite" hidden></p>
-      <p class="form-error" data-dashboard-error role="alert" aria-live="polite" hidden></p>
-    </section>
-    <section class="dashboard-summary" id="last-session" aria-labelledby="last-session-title">
-      <div>
-        <span class="eyebrow">Your progress</span>
-        <h2 id="last-session-title">Last session</h2>
-        <p class="dashboard-copy">Session history will appear here when available.</p>
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <a class="brand" href="gym.html">VYRONEX</a>
+        <span class="badge badge-info">HOME / GYM</span>
       </div>
-      <span class="summary-empty" aria-hidden="true">—</span>
-    </section>
-    <section class="quick-stats" data-quick-stats aria-label="Quick stats"></section>
-    <section class="activity-section" id="activities" aria-labelledby="activity-title">
-      <div class="section-heading">
+      <nav>
+        <ul class="nav-links">
+          <li><a href="gym.html" class="active">Home</a></li>
+          <li><a href="history.html">History</a></li>
+          <li><a href="coach.html">Coach</a></li>
+          <li><a href="profile.html">Profile</a></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <!-- Greeting & Quick Stats -->
+    <div style="margin-bottom: 28px;">
+      <span class="eyebrow" style="color: var(--muted); font-size: 0.88rem; font-weight: 600;">TRAINING DASHBOARD</span>
+      <h1 class="title-accent" style="margin-top: 4px;">Welcome Back, <span id="header-user-name">Athlete</span>!</h1>
+      <p style="color: var(--muted); font-size: 1.05rem; margin-top: 8px;">Select a movement to begin real-time computer vision form screening.</p>
+    </div>
+
+    <!-- Last Session Summary Card -->
+    <div id="latest-session-card" class="card" style="border-left: 5px solid var(--blue); margin-bottom: 32px;" hidden>
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
+        <h3 style="margin: 0; color: var(--blue-deep);">📊 Last Workout Summary</h3>
+        <span id="latest-risk-badge" class="badge badge-good">Good Form</span>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin: 16px 0;">
         <div>
-          <span class="eyebrow">Training library</span>
-          <h2 id="activity-title">Gym workouts</h2>
+          <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Activity</span>
+          <div id="latest-activity" style="font-size: 1.2rem; font-weight: 700; color: var(--ink);">Squat</div>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Reps Completed</span>
+          <div id="latest-reps" style="font-size: 1.2rem; font-weight: 700; color: var(--ink);">0</div>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Accuracy</span>
+          <div id="latest-accuracy" style="font-size: 1.2rem; font-weight: 700; color: var(--green);">0%</div>
+        </div>
+        <div>
+          <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Form Score</span>
+          <div id="latest-score" style="font-size: 1.2rem; font-weight: 700; color: var(--ink);">0/100</div>
         </div>
       </div>
-      <div class="activity-grid" data-activities></div>
-    </section>
+      <div>
+        <a id="latest-report-link" href="report.html" class="btn btn-secondary btn-sm">View Detailed Report &rarr;</a>
+      </div>
+    </div>
+
+    <!-- Activities Grid -->
+    <div>
+      <h2 style="margin-bottom: 4px;">Choose an Exercise</h2>
+      <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 16px;">Real-time audio feedback with camera or video upload analysis.</p>
+
+      <div class="activity-grid" id="activities-container">
+        <!-- Rendered dynamically from activities.js -->
+      </div>
+    </div>
   </main>
+
+  <script type="module">
+    import { requireAuth } from "./assets/js/guard.js";
+    import { getActivitiesByCategory } from "./assets/js/activities.js";
+    import { apiFetch, escapeHtml } from "./assets/js/auth.js";
+
+    async function init() {
+      const user = await requireAuth("gym");
+      if (!user) return;
+
+      // Render Gym Activities
+      const activities = getActivitiesByCategory("gym");
+      const container = document.getElementById("activities-container");
+      container.innerHTML = activities.map(act => `
+        <a href="activity.html?activity=${encodeURIComponent(act.id)}" class="activity-card">
+          <div>
+            <div class="activity-icon">${act.icon}</div>
+            <h3>${escapeHtml(act.label)}</h3>
+            <p>${escapeHtml(act.description)}</p>
+          </div>
+          <div class="btn btn-primary btn-sm" style="align-self: flex-start; margin-top: 10px;">
+            Start Screening &rarr;
+          </div>
+        </a>
+      `).join("");
+
+      // Fetch Latest Session
+      try {
+        const res = await apiFetch("/api/reports/latest");
+        const report = await res.json();
+        if (report && report.session_id) {
+          document.getElementById("latest-activity").textContent = (report.activity || "Squat").toUpperCase();
+          document.getElementById("latest-reps").textContent = report.totals?.reps || 0;
+          document.getElementById("latest-accuracy").textContent = `${report.accuracy_pct || 0}%`;
+          document.getElementById("latest-score").textContent = `${report.avg_form_score || 0}/100`;
+
+          const risk = (report.overall_risk || "LOW").toUpperCase();
+          const riskEl = document.getElementById("latest-risk-badge");
+          riskEl.textContent = risk === "HIGH" ? "Risky" : (risk === "MODERATE" ? "Fix Needed" : "Good Form");
+          riskEl.className = `badge ${risk === "HIGH" ? "badge-risky" : (risk === "MODERATE" ? "badge-fix" : "badge-good")}`;
+
+          document.getElementById("latest-report-link").href = `report.html?session=${report.session_id}`;
+          document.getElementById("latest-session-card").hidden = false;
+        }
+      } catch {
+        // No prior sessions recorded yet
+      }
+    }
+
+    init();
+  </script>
 </body>
 </html>

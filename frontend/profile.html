@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Athlete Profile & Consent Settings | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <a class="brand" href="index.html">VYRONEX</a>
+        <span class="badge badge-info">SETTINGS</span>
+      </div>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="javascript:history.back()">Back</a></li>
+          <li><a href="history.html">History</a></li>
+          <li><a href="coach.html">Coach</a></li>
+          <li><a href="profile.html" class="active">Profile</a></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 720px;">
+    <div style="margin-bottom: 24px;">
+      <span class="eyebrow" style="color: var(--muted); font-size: 0.85rem; font-weight: 600;">ACCOUNT & BIOMETRICS</span>
+      <h1 class="title-accent" style="margin-top: 4px;">Athlete Profile Settings</h1>
+      <p style="color: var(--muted); font-size: 0.95rem; margin-top: 6px;">Manage your physical parameters and data privacy consent.</p>
+    </div>
+
+    <div id="profile-success" class="alert-success" role="alert" hidden></div>
+    <div id="profile-error" class="alert-error" role="alert" hidden></div>
+
+    <div class="card">
+      <form id="profile-form">
+        <div class="form-group">
+          <label>Full Name</label>
+          <input type="text" id="prof-name" disabled style="background: #f4f3ef; color: var(--muted);">
+        </div>
+
+        <div class="form-group">
+          <label>Email Address</label>
+          <input type="email" id="prof-email" disabled style="background: #f4f3ef; color: var(--muted);">
+        </div>
+
+        <div class="form-group">
+          <label>Training Role</label>
+          <input type="text" id="prof-role" disabled style="background: #f4f3ef; color: var(--muted);">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+          <div class="form-group">
+            <label for="prof-age">Age</label>
+            <input type="number" id="prof-age" name="age" min="13" max="120">
+          </div>
+          <div class="form-group">
+            <label for="prof-height">Height (cm)</label>
+            <input type="number" id="prof-height" name="height_cm" min="100" max="250" step="0.1">
+          </div>
+          <div class="form-group">
+            <label for="prof-weight">Weight (kg)</label>
+            <input type="number" id="prof-weight" name="weight_kg" min="30" max="300" step="0.1">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="prof-injury">Injury History / Sensitivities</label>
+          <input type="text" id="prof-injury" name="injury_history" placeholder="e.g., lower_back, left_knee (comma-separated)">
+          <div class="form-help">Helps the AI coach suggest relevant warm-ups and caution notes.</div>
+        </div>
+
+        <!-- Consent Toggle -->
+        <div style="background: #fdfaf6; border: 1.5px solid var(--line); border-radius: var(--radius-md); padding: 18px; margin: 20px 0;">
+          <div style="display: flex; gap: 12px; align-items: flex-start;">
+            <input type="checkbox" id="prof-consent" name="data_consent" style="width: 20px; height: 20px; accent-color: var(--red); margin-top: 2px;">
+            <div>
+              <label for="prof-consent" style="font-weight: 700; color: var(--ink); cursor: pointer; display: inline;">
+                Allow my anonymized movement data to improve the model
+              </label>
+              <div style="color: var(--muted); font-size: 0.85rem; margin-top: 4px; line-height: 1.5;">
+                When enabled, computed joint coordinates (no raw video) assist model calibration. You can withdraw anytime.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <button type="submit" id="save-btn" class="btn btn-primary" style="width: 100%;">
+          Save Changes
+        </button>
+      </form>
+    </div>
+
+    <!-- Data Privacy & Deletion Card -->
+    <div class="card" style="border: 1px solid #fecaca; background: #fffdfd;">
+      <h3 style="color: var(--red-deep); margin-top: 0;">Privacy & Right to Withdraw</h3>
+      <p style="color: var(--muted); font-size: 0.88rem; margin-bottom: 16px;">
+        Withdraw training consent and permanently delete all stored movement feature arrays associated with your account.
+      </p>
+      <button id="delete-data-btn" class="btn btn-secondary btn-sm" style="color: var(--red-deep); border-color: var(--red);">
+        🗑️ Delete My Movement Data & Withdraw Consent
+      </button>
+    </div>
+  </main>
+
+  <script type="module">
+    import { requireAuth } from "./assets/js/guard.js";
+    import { apiFetch } from "./assets/js/auth.js";
+
+    let currentUser = null;
+
+    async function init() {
+      currentUser = await requireAuth();
+      if (!currentUser) return;
+
+      document.getElementById("prof-name").value = currentUser.name || "";
+      document.getElementById("prof-email").value = currentUser.email || "";
+      document.getElementById("prof-role").value = (currentUser.role === "gym" ? "Home Workout / Gym" : "Track & Field Athlete");
+      if (currentUser.age) document.getElementById("prof-age").value = currentUser.age;
+      if (currentUser.height_cm) document.getElementById("prof-height").value = currentUser.height_cm;
+      if (currentUser.weight_kg) document.getElementById("prof-weight").value = currentUser.weight_kg;
+      if (currentUser.injury_history) document.getElementById("prof-injury").value = currentUser.injury_history.join(", ");
+      document.getElementById("prof-consent").checked = Boolean(currentUser.data_consent);
+
+      const form = document.getElementById("profile-form");
+      const successEl = document.getElementById("profile-success");
+      const errorEl = document.getElementById("profile-error");
+      const saveBtn = document.getElementById("save-btn");
+
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        successEl.hidden = true;
+        errorEl.hidden = true;
+
+        const age = document.getElementById("prof-age").value;
+        const height_cm = document.getElementById("prof-height").value;
+        const weight_kg = document.getElementById("prof-weight").value;
+        const injuryRaw = document.getElementById("prof-injury").value;
+        const data_consent = document.getElementById("prof-consent").checked;
+
+        const injury_history = injuryRaw ? injuryRaw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+
+        const payload = {
+          data_consent,
+          injury_history,
+        };
+        if (age) payload.age = parseInt(age, 10);
+        if (height_cm) payload.height_cm = parseFloat(height_cm);
+        if (weight_kg) payload.weight_kg = parseFloat(weight_kg);
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Saving...";
+
+        try {
+          const res = await apiFetch("/api/auth/profile", {
+            method: "PUT",
+            body: JSON.stringify(payload),
+          });
+          const updated = await res.json();
+          successEl.textContent = "Profile and consent settings updated successfully.";
+          successEl.hidden = false;
+        } catch (err) {
+          errorEl.textContent = err.message;
+          errorEl.hidden = false;
+        } finally {
+          saveBtn.disabled = false;
+          saveBtn.textContent = "Save Changes";
+        }
+      });
+
+      document.getElementById("delete-data-btn").addEventListener("click", async () => {
+        if (!confirm("Are you sure you want to withdraw consent and delete all stored movement features?")) return;
+
+        try {
+          await apiFetch("/api/auth/data", { method: "DELETE" });
+          document.getElementById("prof-consent").checked = false;
+          successEl.textContent = "Your movement features have been deleted and training consent withdrawn.";
+          successEl.hidden = false;
+        } catch (err) {
+          errorEl.textContent = err.message;
+          errorEl.hidden = false;
+        }
+      });
+    }
+
+    init();
+  </script>
+</body>
+</html>

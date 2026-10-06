@@ -35,7 +35,13 @@ from core.deps import get_current_user
 from routes.auth import router as auth_router
 from routes.athlete import router as athlete_router
 from routes.gym import router as gym_router
+from routes.upload import router as upload_router
 from routes.ws import router as live_router
+from routes.feedback import router as feedback_router
+from routes.expert import router as expert_router
+from routes.coach import router as coach_router
+from routes.reports import router as reports_router
+from routes.history import router as history_router
 from services.session_service import (
     create_session,
     finish_session,
@@ -57,7 +63,13 @@ app = FastAPI(title="VYRONEX Backend", version="0.2.0", lifespan=lifespan)
 app.include_router(auth_router)
 app.include_router(gym_router)
 app.include_router(athlete_router)
+app.include_router(upload_router)
 app.include_router(live_router)
+app.include_router(feedback_router)
+app.include_router(expert_router)
+app.include_router(coach_router)
+app.include_router(reports_router)
+app.include_router(history_router)
 
 # Wide-open CORS: this is a local prototype meant to be hit from a
 # frontend served on a different origin/port (e.g. a local static file

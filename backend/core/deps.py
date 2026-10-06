@@ -11,7 +11,7 @@ from .security import decode_access_token
 
 
 _bearer = HTTPBearer(auto_error=False)
-_USER_ROLES = {"gym", "athlete"}
+_USER_ROLES = {"gym", "athlete", "expert"}
 
 
 async def get_current_user(
@@ -47,3 +47,32 @@ def require_role(*roles: str):
         return user
 
     return role_guard
+
+
+async def get_current_user_optional(
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+) -> dict[str, Any] | None:
+    if credentials is None:
+        return None
+    try:
+        claims = decode_access_token(credentials.credentials, Settings.from_env().jwt_secret)
+        user_id = claims.get("sub")
+        role = claims.get("role")
+        if (
+            not isinstance(user_id, str)
+            or not user_id
+            or not isinstance(role, str)
+            or role not in _USER_ROLES
+        ):
+            return None
+    except (JWTError, ValueError):
+        return None
+
+    if not hasattr(request.app.state, "database") or request.app.state.database is None:
+        return {"_id": user_id, "role": role}
+
+    user = await request.app.state.database.users.find_one({"_id": user_id})
+    if user is None or user.get("role") != claims["role"]:
+        return None
+    return user

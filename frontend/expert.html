@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10120f">
+  <title>Expert Review Queue & Model Supervision | VYRONEX</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <style>
+    .expert-container {
+      width: min(1200px, calc(100% - 40px));
+      margin: 30px auto;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .grid-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 16px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .stat-val {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--accent);
+      margin-top: 6px;
+    }
+    .queue-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 0.9rem;
+    }
+    .queue-table th, .queue-table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .queue-table th {
+      background: var(--surface-raised);
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+      font-size: 0.75rem;
+      letter-spacing: 0.05em;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .badge-high { background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3); }
+    .badge-mod { background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .badge-low { background: rgba(34, 197, 94, 0.2); color: #4ade80; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .badge-disputed { background: rgba(217, 70, 239, 0.2); color: #e879f9; border: 1px solid rgba(217, 70, 239, 0.3); }
+    .action-btn-sm {
+      min-height: 32px;
+      padding: 0 12px;
+      font-size: 0.8rem;
+      border-radius: 6px;
+    }
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      backdrop-filter: blur(4px);
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <a class="brand" href="expert.html">VYRONEX</a>
+      <span class="badge" style="background: rgba(200, 241, 105, 0.15); color: var(--accent); border: 1px solid var(--accent);">EXPERT PORTAL</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 16px;">
+      <span id="expert-name" style="color: var(--muted); font-size: 0.9rem;">Expert Reviewer</span>
+      <a href="coach.html" class="header-link">AI Coach</a>
+      <a href="history.html" class="header-link">Athlete History</a>
+      <button id="logout-btn" class="button-link" style="min-height: 36px; padding: 0 14px; font-size: 0.85rem; background: var(--surface-raised); color: #fff; border: 1px solid var(--border);">Log out</button>
+    </div>
+  </header>
+
+  <main class="expert-container">
+    <section>
+      <span class="eyebrow">Human-in-the-Loop Supervision</span>
+      <h1>Expert Review Queue & Safe Retraining</h1>
+      <p style="color: var(--muted); max-width: 750px;">
+        Review algorithm predictions flagged as low-confidence (&lt; 0.60) or disputed by athletes. Only coach-confirmed ground truth labels are admitted to model retraining.
+      </p>
+    </section>
+
+    <!-- Stats -->
+    <section class="grid-cards">
+      <div class="stat-card">
+        <div style="color: var(--muted); font-size: 0.85rem;">Items Awaiting Review</div>
+        <div id="queue-count" class="stat-val">0</div>
+      </div>
+      <div class="stat-card">
+        <div style="color: var(--muted); font-size: 0.85rem;">Active Model Version</div>
+        <div id="active-version" class="stat-val" style="font-size: 1.5rem; color: #60a5fa;">v1.0.0</div>
+      </div>
+      <div class="stat-card">
+        <div style="color: var(--muted); font-size: 0.85rem;">Review Threshold</div>
+        <div class="stat-val" style="font-size: 1.5rem; color: #f59e0b;">&lt; 60% Conf.</div>
+      </div>
+      <div class="stat-card" style="display: flex; flex-direction: column; justify-content: center;">
+        <button id="trigger-retrain-btn" style="width: 100%;">⚡ Trigger Safe Retrain</button>
+        <span id="retrain-status" style="font-size: 0.75rem; color: var(--muted); margin-top: 6px; text-align: center;">Safe champion-challenger loop</span>
+      </div>
+    </section>
+
+    <!-- Review Queue Table -->
+    <section class="stat-card" style="overflow-x: auto;">
+      <h2 style="font-size: 1.2rem; margin-top: 0;">Disputed Reps & Low-Confidence Queue</h2>
+      <table class="queue-table">
+        <thead>
+          <tr>
+            <th>Rep ID / Session</th>
+            <th>Predicted Risk</th>
+            <th>Confidence</th>
+            <th>Defect / Body Area</th>
+            <th>Disputed Flag</th>
+            <th>Kinematics</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="queue-tbody">
+          <tr><td colspan="7" style="text-align: center; color: var(--muted); padding: 24px;">Loading review queue...</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- Model Versions Registry -->
+    <section class="stat-card">
+      <h2 style="font-size: 1.2rem; margin-top: 0;">Model Version Registry & Rollback History</h2>
+      <div id="versions-container" style="display: flex; flex-direction: column; gap: 10px; margin-top: 12px;">
+        <div style="color: var(--muted);">Loading version history...</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Labeling Modal -->
+  <div id="label-modal" class="modal-backdrop" hidden>
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; width: min(520px, calc(100% - 30px)); padding: 24px;">
+      <h3 style="margin-top: 0;">Expert Ground-Truth Review</h3>
+      <p id="modal-rep-info" style="color: var(--muted); font-size: 0.85rem; margin-bottom: 16px;"></p>
+      
+      <form id="expert-label-form">
+        <input type="hidden" id="modal-rep-id">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px;">True Risk Level</label>
+            <select id="modal-true-risk" style="width: 100%; background: var(--surface-raised); color: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 8px;" required>
+              <option value="LOW">LOW Risk (Proper Technique)</option>
+              <option value="MODERATE">MODERATE Risk (Minor Technique Flaw)</option>
+              <option value="HIGH">HIGH Risk (Critical Safety Fault)</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px;">Fault Type</label>
+            <select id="modal-true-defect" style="width: 100%; background: var(--surface-raised); color: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 8px;">
+              <option value="none">None (Clean Rep)</option>
+              <option value="knee_valgus">Knee Valgus / Inward Collapse</option>
+              <option value="back_posture">Spine Flexion / Excessive Lean</option>
+              <option value="shallow_depth">Insufficient Squat Depth</option>
+              <option value="knee_symmetry">Asymmetrical Loading / Drift</option>
+              <option value="movement_control">Rapid / Uncontrolled Descent</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 6px;">Expert Clinical Notes</label>
+            <textarea id="modal-notes" rows="3" style="width: 100%; background: var(--surface-raised); color: #fff; border: 1px solid var(--border); padding: 10px; border-radius: 8px;" placeholder="e.g., Severe right knee valgus during transition from eccentric to concentric phase."></textarea>
+          </div>
+
+          <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 10px;">
+            <button type="button" id="modal-cancel-btn" style="background: var(--surface-raised); color: #fff; border: 1px solid var(--border);">Cancel</button>
+            <button type="submit" id="modal-submit-btn">Save Expert Label</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { apiFetch, requireAuth, logout } from "./assets/auth.js";
+
+    let currentQueue = [];
+
+    async function init() {
+      const user = await requireAuth("expert");
+      if (!user) return;
+      document.getElementById("expert-name").textContent = user.name || "Expert Coach";
+      document.getElementById("logout-btn").addEventListener("click", logout);
+
+      await loadQueue();
+      await loadVersions();
+
+      document.getElementById("trigger-retrain-btn").addEventListener("click", handleRetrain);
+      document.getElementById("modal-cancel-btn").addEventListener("click", () => {
+        document.getElementById("label-modal").hidden = true;
+      });
+      document.getElementById("expert-label-form").addEventListener("submit", handleSaveLabel);
+    }
+
+    async function loadQueue() {
+      try {
+        const res = await apiFetch("/api/expert/queue");
+        const data = await res.json();
+        currentQueue = data.items || [];
+        document.getElementById("queue-count").textContent = data.queue_count || 0;
+
+        const tbody = document.getElementById("queue-tbody");
+        if (currentQueue.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--accent); padding: 24px;">✓ Review queue is clear. All reps reviewed or high-confidence.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = currentQueue.map(item => {
+          const riskBadge = item.predicted_risk_level === "HIGH" ? "badge-high" : (item.predicted_risk_level === "MODERATE" ? "badge-mod" : "badge-low");
+          const disputedBadge = item.disputed ? `<span class="badge badge-disputed">Disputed</span>` : `<span style="color: var(--muted); font-size: 0.8rem;">Auto Low-Conf</span>`;
+          const confPct = Math.round((item.model_confidence || 0.85) * 100);
+
+          return `
+            <tr>
+              <td><code>${item.rep_id.slice(0, 8)}</code> <small style="color: var(--muted);">(Rep #${item.rep_number})</small></td>
+              <td><span class="badge ${riskBadge}">${item.predicted_risk_level || "LOW"}</span></td>
+              <td><b>${confPct}%</b></td>
+              <td>${item.predicted_defect_type || "None"} <small style="color: var(--muted);">(${item.body_area || "general"})</small></td>
+              <td>${disputedBadge}</td>
+              <td><small style="color: var(--muted); font-family: monospace;">torso: ${item.features?.torso_angle?.toFixed(1) || 'N/A'}°, valgus: ${item.features?.knee_alignment?.toFixed(2) || 'N/A'}</small></td>
+              <td><button class="action-btn-sm" onclick="window.openLabelModal('${item.rep_id}')">Review & Label</button></td>
+            </tr>
+          `;
+        }).join("");
+      } catch (err) {
+        document.getElementById("queue-tbody").innerHTML = `<tr><td colspan="7" style="color: var(--danger);">${err.message}</td></tr>`;
+      }
+    }
+
+    async function loadVersions() {
+      try {
+        const res = await apiFetch("/api/expert/versions");
+        const data = await res.json();
+        const versions = data.versions || [];
+
+        const active = versions.find(v => v.active);
+        if (active) {
+          document.getElementById("active-version").textContent = active.version;
+        }
+
+        const container = document.getElementById("versions-container");
+        if (versions.length === 0) {
+          container.innerHTML = `<div style="color: var(--muted);">No model versions registered yet.</div>`;
+          return;
+        }
+
+        container.innerHTML = versions.slice().reverse().map(v => {
+          const statusBadge = v.active
+            ? `<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #4ade80;">ACTIVE CHAMPION</span>`
+            : `<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: #94a3b8;">ARCHIVED</span>`;
+          const metrics = v.metrics || {};
+          const note = v.rejection_reason ? `<div style="color: #f87171; font-size: 0.8rem; margin-top: 4px;">Rejected: ${v.rejection_reason}</div>` : "";
+
+          return `
+            <div style="background: var(--surface-raised); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <strong>${v.version}</strong> &nbsp; ${statusBadge} &nbsp; <small style="color: var(--muted);">Trained: ${new Date(v.trained_at).toLocaleDateString()}</small>
+                <div style="font-size: 0.85rem; color: #d1d5db; margin-top: 4px;">
+                  Accuracy: <b>${((metrics.accuracy || 0) * 100).toFixed(1)}%</b> | High-Risk Recall: <b>${((metrics.high_risk_recall || 0) * 100).toFixed(1)}%</b> | Samples: ${v.sample_count || 0}
+                </div>
+                ${note}
+              </div>
+            </div>
+          `;
+        }).join("");
+      } catch (err) {
+        console.error("Failed to load versions", err);
+      }
+    }
+
+    window.openLabelModal = function(repId) {
+      const item = currentQueue.find(i => i.rep_id === repId);
+      if (!item) return;
+
+      document.getElementById("modal-rep-id").value = repId;
+      document.getElementById("modal-rep-info").textContent = `Reviewing Rep #${item.rep_number} | Predicted: ${item.predicted_risk_level} (${Math.round((item.model_confidence || 0.85)*100)}% conf.)`;
+      document.getElementById("modal-true-risk").value = item.predicted_risk_level || "LOW";
+      document.getElementById("modal-true-defect").value = item.predicted_defect_type || "none";
+      document.getElementById("modal-notes").value = item.user_comment ? `User comment: "${item.user_comment}"` : "";
+      document.getElementById("label-modal").hidden = false;
+    };
+
+    async function handleSaveLabel(e) {
+      e.preventDefault();
+      const repId = document.getElementById("modal-rep-id").value;
+      const trueRisk = document.getElementById("modal-true-risk").value;
+      const trueDefect = document.getElementById("modal-true-defect").value;
+      const notes = document.getElementById("modal-notes").value;
+
+      try {
+        await apiFetch(`/api/expert/label/${repId}`, {
+          method: "POST",
+          body: JSON.stringify({
+            true_risk_level: trueRisk,
+            true_defect_type: trueDefect === "none" ? null : trueDefect,
+            notes: notes || null,
+          }),
+        });
+
+        document.getElementById("label-modal").hidden = true;
+        await loadQueue();
+      } catch (err) {
+        alert("Failed to save label: " + err.message);
+      }
+    }
+
+    async function handleRetrain() {
+      const btn = document.getElementById("trigger-retrain-btn");
+      const statusEl = document.getElementById("retrain-status");
+      btn.disabled = true;
+      btn.textContent = "Retraining in progress...";
+      statusEl.textContent = "Executing GroupKFold evaluation against champion...";
+
+      try {
+        const res = await apiFetch("/api/expert/retrain", {
+          method: "POST",
+          body: JSON.stringify({ exercise: "squat", force_activate: false }),
+        });
+        const result = await res.json();
+        
+        if (result.status === "activated") {
+          statusEl.textContent = `✓ Activated candidate ${result.version} as new champion!`;
+          statusEl.style.color = "var(--accent)";
+        } else {
+          statusEl.textContent = `Champion retained. (${result.rejection_reason || result.message})`;
+          statusEl.style.color = "#f59e0b";
+        }
+        await loadVersions();
+      } catch (err) {
+        statusEl.textContent = `Retraining error: ${err.message}`;
+        statusEl.style.color = "var(--danger)";
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "⚡ Trigger Safe Retrain";
+      }
+    }
+
+    init();
+  </script>
+</body>
+</html>

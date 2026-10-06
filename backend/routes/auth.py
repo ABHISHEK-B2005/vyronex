@@ -32,6 +32,7 @@ def _user_out(user: dict) -> UserOut:
         height_cm=user.get("height_cm"),
         weight_kg=user.get("weight_kg"),
         injury_history=user.get("injury_history", []),
+        data_consent=bool(user.get("data_consent", False)),
         created_at=user.get("created_at"),
     )
 
@@ -87,5 +88,22 @@ async def update_profile(
     updates = body.model_dump(exclude_unset=True)
     if not updates:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Provide at least one profile field")
+    
+    # If user turns off data_consent, respect withdrawal by updating database
     await request.app.state.database.users.update_one({"_id": user["_id"]}, {"$set": updates})
     return _user_out({**user, **updates})
+
+
+@router.delete("/data", status_code=status.HTTP_200_OK)
+async def delete_user_movement_data(
+    request: Request,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    """Delete anonymized movement features and withdraw training consent."""
+    db = request.app.state.database
+    user_id = user["_id"]
+    # Turn off consent
+    await db.users.update_one({"_id": user_id}, {"$set": {"data_consent": False}})
+    # Clear features from reps to guarantee privacy
+    await db.reps.update_many({"user_id": user_id}, {"$set": {"features": {}}})
+    return {"message": "Movement data cleared and training consent withdrawn successfully"}

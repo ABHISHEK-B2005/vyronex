@@ -1,0 +1,75 @@
+{
+  "long_jump": {
+    "takeoff": {
+      "knee_angle": {
+        "mean": 165.0,
+        "std": 6.0,
+        "unit": "°"
+      },
+      "torso_lean": {
+        "mean": 8.0,
+        "std": 3.0,
+        "unit": "°"
+      },
+      "hip_angle": {
+        "mean": 160.0,
+        "std": 8.0,
+        "unit": "°"
+      }
+    },
+    "landing": {
+      "knee_symmetry": {
+        "mean": 4.0,
+        "std": 2.5,
+        "unit": "°"
+      },
+      "knee_valgus": {
+        "mean": 0.02,
+        "std": 0.015,
+        "unit": "ratio"
+      }
+    }
+  },
+  "shot_put": {
+    "glide": {
+      "trunk_angle": {
+        "mean": 42.0,
+        "std": 5.0,
+        "unit": "°"
+      }
+    },
+    "delivery": {
+      "knee_angle": {
+        "mean": 145.0,
+        "std": 7.0,
+        "unit": "°"
+      },
+      "release_angle": {
+        "mean": 38.0,
+        "std": 4.0,
+        "unit": "°"
+      }
+    }
+  },
+  "javelin_throw": {
+    "plant": {
+      "plant_knee_angle": {
+        "mean": 168.0,
+        "std": 5.0,
+        "unit": "°"
+      },
+      "torso_lean": {
+        "mean": 25.0,
+        "std": 4.0,
+        "unit": "°"
+      }
+    },
+    "delivery": {
+      "shoulder_angle": {
+        "mean": 120.0,
+        "std": 8.0,
+        "unit": "°"
+      }
+    }
+  }
+}

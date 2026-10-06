@@ -15,6 +15,7 @@ export function logout() {
 }
 
 function rolePage(role) {
+  if (role === "expert") return "expert.html";
   return role === "gym" ? "gym.html" : "athlete.html";
 }
 
@@ -145,6 +146,7 @@ if (signupForm) {
       email: String(form.get("email")).trim(),
       password,
       role: String(form.get("role")),
+      data_consent: form.get("data_consent") === "on",
     };
     for (const field of ["age", "height_cm", "weight_kg"]) {
       const value = form.get(field);

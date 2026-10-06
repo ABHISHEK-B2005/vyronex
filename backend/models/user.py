@@ -6,7 +6,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
-UserRole = Literal["gym", "athlete"]
+UserRole = Literal["gym", "athlete", "expert"]
 
 
 class SignupIn(BaseModel):
@@ -18,6 +18,7 @@ class SignupIn(BaseModel):
     height_cm: float | None = Field(default=None, gt=0, le=260)
     weight_kg: float | None = Field(default=None, gt=0, le=500)
     injury_history: list[str] = Field(default_factory=list)
+    data_consent: bool = Field(default=False, description="Allow anonymized movement data to improve the model")
 
     @field_validator("email")
     @classmethod
@@ -48,6 +49,7 @@ class ProfileUpdateIn(BaseModel):
     height_cm: float | None = Field(default=None, gt=0, le=260)
     weight_kg: float | None = Field(default=None, gt=0, le=500)
     injury_history: list[str] = Field(default_factory=list, max_length=100)
+    data_consent: bool | None = None
 
 
 class UserOut(BaseModel):
@@ -59,6 +61,7 @@ class UserOut(BaseModel):
     height_cm: float | None = None
     weight_kg: float | None = None
     injury_history: list[str] = Field(default_factory=list)
+    data_consent: bool = False
     created_at: datetime | None = None
 
 
@@ -78,4 +81,5 @@ class UserRecord(BaseModel):
     height_cm: float | None = None
     weight_kg: float | None = None
     injury_history: list[str] = Field(default_factory=list)
+    data_consent: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

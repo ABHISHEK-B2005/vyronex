@@ -31,6 +31,19 @@ class FakeCollection:
     async def update_one(self, query, update):
         self.updates.append((query, update))
 
+    def find(self, query):
+        matches = [
+            document
+            for document in self.documents
+            if all(document.get(key) == value for key, value in query.items())
+        ]
+
+        class FakeCursor:
+            async def to_list(self, length=None):
+                return list(matches if length is None else matches[:length])
+
+        return FakeCursor()
+
 
 class LiveWebSocketTests(unittest.TestCase):
     def setUp(self):

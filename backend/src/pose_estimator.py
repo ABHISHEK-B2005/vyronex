@@ -24,7 +24,7 @@ from src.landmarks import BodyLandmarks
 try:
     import mediapipe as mp
 
-    MEDIAPIPE_AVAILABLE = True
+    MEDIAPIPE_AVAILABLE = hasattr(mp, "solutions") and hasattr(mp.solutions, "pose")
 except Exception:  # pragma: no cover - environment dependent
     MEDIAPIPE_AVAILABLE = False
     mp = None  # type: ignore
@@ -48,25 +48,28 @@ class PoseEstimator:
         min_tracking_confidence: float = POSE_MIN_TRACKING_CONFIDENCE,
         model_complexity: int = 1,
     ) -> None:
-        if not MEDIAPIPE_AVAILABLE:
+        if not MEDIAPIPE_AVAILABLE or mp is None or not hasattr(mp, "solutions") or not hasattr(mp.solutions, "pose"):
             raise PoseEstimatorUnavailable(
-                "MediaPipe is not installed or failed to import. "
-                "Install it with `pip install mediapipe` to enable live "
-                "pose detection, or use Demo Mode."
+                "MediaPipe Pose solution is not available on this system. "
+                "Ensure mediapipe with solutions support is installed."
             )
 
         self._mp_pose = mp.solutions.pose
-        self._mp_drawing = mp.solutions.drawing_utils
-        self._mp_drawing_styles = mp.solutions.drawing_styles
+        self._mp_drawing = getattr(mp.solutions, "drawing_utils", None)
+        self._mp_drawing_styles = getattr(mp.solutions, "drawing_styles", None)
 
         # Created ONCE and reused across frames (important for performance).
-        self._pose = self._mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=model_complexity,
-            smooth_landmarks=True,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence,
-        )
+        try:
+            self._pose = self._mp_pose.Pose(
+                static_image_mode=False,
+                model_complexity=model_complexity,
+                smooth_landmarks=True,
+                min_detection_confidence=min_detection_confidence,
+                min_tracking_confidence=min_tracking_confidence,
+            )
+        except Exception as exc:
+            raise PoseEstimatorUnavailable(f"Could not initialize MediaPipe Pose: {exc}") from exc
+
 
     def process(self, frame_bgr: np.ndarray) -> Tuple[Optional[BodyLandmarks], object, bool]:
         """Run pose estimation on a single BGR frame.

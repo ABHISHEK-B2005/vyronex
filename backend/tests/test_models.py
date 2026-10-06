@@ -41,15 +41,26 @@ class ActivityModelTests(unittest.TestCase):
             user_id="user-1", activity="squat", source="live", avg_form_score=85,
         )
         rep = RepRecord(
+            user_id="user-1",
             session_id="session-1",
             rep_number=1,
             timestamp_sec=2.5,
-            status="complete",
-            risk_level="low",
+            status="correct",
+            risk_level="LOW",
         )
 
         self.assertEqual(session.source, "live")
         self.assertEqual(rep.rep_number, 1)
+
+    def test_rep_requires_classification_and_owner(self):
+        with self.assertRaises(ValidationError):
+            RepRecord(
+                session_id="session-1",
+                rep_number=1,
+                timestamp_sec=2.5,
+                status="complete",
+                risk_level="low",
+            )
 
     def test_report_rejects_accuracy_outside_percentage_range(self):
         with self.assertRaises(ValidationError):

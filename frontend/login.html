@@ -3,39 +3,82 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10120f">
-  <title>Log in | VYRONEX</title>
-  <link rel="stylesheet" href="assets/style.css">
-  <script type="module" src="assets/auth.js"></script>
+  <title>Log In | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="login.html" aria-label="VYRONEX home">VYRONEX</a>
-    <a class="header-link" href="signup.html">New here? Create an account</a>
+    <div class="header-inner">
+      <a class="brand" href="index.html">VYRONEX</a>
+      <nav>
+        <span style="font-size: 0.95rem; color: var(--muted);">New to Vyronex? <a href="signup.html">Create an account</a></span>
+      </nav>
+    </div>
   </header>
-  <main class="auth-layout">
-    <section class="auth-intro">
-      <span class="eyebrow">Welcome back</span>
-      <h1>Pick up where you left off.</h1>
-      <p>Log in to continue your training and review your movement insights.</p>
-    </section>
-    <section class="auth-card" aria-labelledby="login-title">
-      <h2 id="login-title">Log in</h2>
-      <p class="form-note">Enter the email and password linked to your account.</p>
+
+  <main class="main-content" style="max-width: 460px; padding-top: 48px;">
+    <div class="card">
+      <h1 style="font-size: 1.85rem; margin-bottom: 6px;" class="title-accent">Log In</h1>
+      <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 24px;">Welcome back. Sign in to access your training dashboard.</p>
+
+      <div id="login-error" class="alert-error" role="alert" hidden></div>
+
       <form id="login-form">
-        <div class="field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" required maxlength="254">
+        <div class="form-group">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" name="email" required autocomplete="email" placeholder="you@example.com">
         </div>
-        <div class="field">
+
+        <div class="form-group">
           <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required maxlength="128">
+          <input type="password" id="password" name="password" required autocomplete="current-password" placeholder="••••••••">
         </div>
-        <p class="form-error" data-form-error role="alert" aria-live="polite" hidden></p>
-        <button type="submit">Log in</button>
+
+        <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%; margin-top: 8px;">Log In</button>
       </form>
-      <p class="form-footer">Need an account? <a href="signup.html">Sign up</a></p>
-    </section>
+    </div>
+
+    <div style="text-align: center; color: var(--muted); font-size: 0.88rem;">
+      Need an account? <a href="signup.html" style="font-weight: 600;">Sign up for free &rarr;</a>
+    </div>
   </main>
+
+  <script type="module">
+    import { apiFetch, setToken } from "./assets/js/auth.js";
+
+    const form = document.getElementById("login-form");
+    const errorEl = document.getElementById("login-error");
+    const btn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.hidden = true;
+
+      const fd = new FormData(form);
+      const email = fd.get("email").trim();
+      const password = fd.get("password");
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Signing in...`;
+
+      try {
+        const res = await apiFetch("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+        const data = await res.json();
+        setToken(data.access_token);
+
+        const role = data.role || data.user?.role || "gym";
+        window.location.assign(role === "gym" ? "gym.html" : "athlete.html");
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = "Log In";
+      }
+    });
+  </script>
 </body>
 </html>

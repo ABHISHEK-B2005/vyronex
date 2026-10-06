@@ -3,78 +3,265 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#10120f">
-  <title>Activity | VYRONEX</title>
-  <link rel="stylesheet" href="assets/style.css">
-  <script type="module" src="assets/auth.js"></script>
-  <script type="module" src="assets/live.js"></script>
+  <title>Movement Analysis | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="gym.html">VYRONEX</a>
-    <button class="text-button" type="button" data-logout>Logout</button>
-  </header>
-  <main class="dashboard-layout activity-page" data-activity-page hidden>
-    <section class="dashboard-card" data-select-activity hidden>
-      <span class="eyebrow">Activity selection</span>
-      <h1>Select an Activity First</h1>
-      <p class="dashboard-copy">Choose an activity from your training dashboard to continue.</p>
-      <div class="dashboard-actions">
-        <a class="button-link" href="gym.html">Gym workouts</a>
-        <a class="header-link" href="athlete.html">Athletics events</a>
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <a class="brand" href="index.html">VYRONEX</a>
+        <span id="header-activity-tag" class="badge badge-info">ANALYSIS</span>
       </div>
-    </section>
-    <section class="dashboard-card" data-selected-activity hidden>
-      <span class="eyebrow" data-activity-category></span>
-      <h1 data-activity-label></h1>
-      <p class="dashboard-copy" data-activity-instructions></p>
-      <h2>Session metrics</h2>
-      <ul class="metric-list" data-activity-metrics></ul>
-      <section class="live-panel" data-live-panel hidden aria-labelledby="live-title">
-        <div class="live-heading">
-          <div>
-            <span class="eyebrow">Live camera coaching</span>
-            <h2 id="live-title">Squat session</h2>
-          </div>
-          <span class="live-connection" data-live-connection role="status">Ready</span>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="javascript:history.back()">Back to Dashboard</a></li>
+          <li><a href="history.html">History</a></li>
+          <li><a href="coach.html">Coach</a></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 960px;">
+    <!-- Invalid Activity Fallback -->
+    <div id="invalid-activity-card" class="card" style="text-align: center; padding: 48px 24px;" hidden>
+      <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
+      <h2 style="margin-bottom: 8px;">Select an Activity First</h2>
+      <p style="color: var(--muted); max-width: 480px; margin: 0 auto 24px;">
+        Please choose an exercise or athletic event from your dashboard to begin computer vision screening.
+      </p>
+      <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
+        <a href="gym.html" class="btn btn-primary">Gym Dashboard</a>
+        <a href="athlete.html" class="btn btn-secondary">Athlete Dashboard</a>
+      </div>
+    </div>
+
+    <!-- Active Screening View -->
+    <div id="screening-view">
+      <!-- Title & Instructions -->
+      <div style="margin-bottom: 20px;">
+        <h1 id="activity-title" class="title-accent" style="margin-bottom: 8px;">Bodyweight Squat</h1>
+        <p id="activity-desc" style="color: var(--muted); font-size: 1.05rem;">Screen knee valgus (cave-in), lumbar flexion, and depth symmetry.</p>
+      </div>
+
+      <!-- Activity Instructions Card -->
+      <div class="card" style="margin-bottom: 24px; padding: 18px 22px; border-left: 4px solid var(--blue); background: #f0f7ff;">
+        <h3 style="margin-top: 0; color: var(--blue-deep); font-size: 1.05rem; margin-bottom: 6px;">📋 Instructions Before Starting</h3>
+        <ul id="instructions-list" style="margin: 0; padding-left: 20px; font-size: 0.92rem; color: #1e3a5f;">
+          <!-- Loaded dynamically -->
+        </ul>
+      </div>
+
+      <!-- Mode Tabs (Camera / Upload) -->
+      <div class="tab-row">
+        <button id="tab-camera-btn" class="tab-btn active">📷 Use Camera (Live)</button>
+        <button id="tab-upload-btn" class="tab-btn">📁 Upload a Video</button>
+      </div>
+
+      <!-- Tab 1: Live Camera Screening -->
+      <div id="tab-camera-panel" class="camera-panel">
+        <div class="camera-wrapper">
+          <video id="live-video" playsinline muted autoplay></video>
+          <canvas id="live-canvas"></canvas>
         </div>
-        <div class="camera-frame" data-camera-frame>
-          <video data-camera autoplay muted playsinline></video>
-          <canvas data-skeleton aria-label="Live pose skeleton overlay"></canvas>
-          <p class="camera-hint" data-camera-hint hidden></p>
-        </div>
-        <div class="live-metrics">
-          <div class="rep-counter">
-            <span>Reps</span>
-            <strong data-rep-count>0</strong>
-          </div>
-          <div class="live-phase">
-            <span>Phase</span>
-            <strong data-phase>Standing</strong>
-          </div>
-          <div class="live-risk" data-risk="LOW">
-            <div class="live-risk-heading">
-              <span>Movement risk</span>
-              <strong data-risk-label>LOW</strong>
+
+        <div id="camera-error" class="alert-error" style="margin-top: 16px;" role="alert" hidden></div>
+
+        <!-- Live HUD Feedback -->
+        <div class="coach-hud">
+          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+            <div>
+              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Completed Reps</span>
+              <div id="hud-reps" style="font-size: 1.8rem; font-weight: 800; color: var(--ink);">0</div>
             </div>
-            <progress data-risk-meter max="100" value="0" aria-label="Movement risk score"></progress>
+            <div>
+              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Phase</span>
+              <div id="hud-phase" style="font-size: 1.2rem; font-weight: 700; color: var(--blue-deep); margin-top: 4px;">READY</div>
+            </div>
+            <div>
+              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Live Risk</span>
+              <div style="margin-top: 4px;"><span id="hud-risk-badge" class="badge badge-good">Good Form</span></div>
+            </div>
+          </div>
+
+          <div>
+            <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Live Coaching Cue</span>
+            <div id="hud-cue" class="coach-hud-cue" aria-live="polite">Ready. Begin movement.</div>
           </div>
         </div>
-        <p class="live-cue" data-live-cue aria-live="polite">Stand tall to begin your squat.</p>
-        <div class="live-controls">
-          <label class="voice-option">
-            <input type="checkbox" data-voice-cues>
-            Speak new cues
-          </label>
-          <button type="button" data-start-live>Start camera</button>
-          <button class="text-button" type="button" data-end-live disabled>End session</button>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 12px;">
+          <div style="font-size: 0.85rem; color: var(--muted);">
+            🔊 Voice coaching cues are active.
+          </div>
+          <button id="finish-workout-btn" class="btn btn-primary">
+            🏁 Finish Workout & View Report
+          </button>
         </div>
-        <p class="form-error" data-live-error role="alert" aria-live="polite" hidden></p>
-        <p class="dashboard-copy" data-session-summary hidden></p>
-      </section>
-      <a class="header-link" data-dashboard-link href="gym.html">Back to dashboard</a>
-    </section>
+      </div>
+
+      <!-- Tab 2: Upload Video File -->
+      <div id="tab-upload-panel" class="card" hidden>
+        <h3 style="margin-top: 0; margin-bottom: 8px;">Upload a Pre-Recorded Video</h3>
+        <p style="color: var(--muted); font-size: 0.92rem; margin-bottom: 20px;">
+          Supported formats: MP4, MOV, WebM. Max size: 100 MB. We process every frame to analyze full rep duration and kinematics.
+        </p>
+
+        <div id="upload-error" class="alert-error" role="alert" hidden></div>
+
+        <form id="upload-form">
+          <div class="form-group">
+            <input type="file" id="video-file-input" accept="video/mp4,video/quicktime,video/webm" required style="padding: 12px;">
+          </div>
+
+          <!-- Progress Bar -->
+          <div id="upload-progress-container" style="margin: 16px 0;" hidden>
+            <div style="display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 6px;">
+              <span id="progress-message" style="color: var(--ink); font-weight: 600;">Processing video...</span>
+              <span id="progress-percent" style="font-weight: 700; color: var(--blue);">0%</span>
+            </div>
+            <div style="background: var(--line); height: 10px; border-radius: 5px; overflow: hidden;">
+              <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--blue); transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <button type="submit" id="upload-submit-btn" class="btn btn-blue" style="width: 100%;">
+            Upload & Analyze Video
+          </button>
+        </form>
+      </div>
+    </div>
   </main>
-  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose@0.5.1675469404/pose.js"></script>
+
+  <script type="module">
+    import { requireAuth } from "./assets/js/guard.js";
+    import { getActivity } from "./assets/js/activities.js";
+    import { startLiveSession, stopLiveSession } from "./assets/js/live.js";
+    import { uploadAndAnalyzeVideo } from "./assets/js/upload.js";
+
+    let activeActivity = null;
+
+    async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+
+      const params = new URLSearchParams(window.location.search);
+      const activityId = params.get("activity");
+
+      activeActivity = getActivity(activityId);
+      if (!activeActivity) {
+        document.getElementById("invalid-activity-card").hidden = false;
+        document.getElementById("screening-view").hidden = true;
+        return;
+      }
+
+      // Populate Activity Details
+      document.getElementById("activity-title").textContent = activeActivity.label;
+      document.getElementById("activity-desc").textContent = activeActivity.description;
+      document.getElementById("header-activity-tag").textContent = activeActivity.label.toUpperCase();
+
+      const instList = document.getElementById("instructions-list");
+      instList.innerHTML = activeActivity.instructions.map(i => `<li>${i}</li>`).join("");
+
+      // Start Live Camera
+      startLiveSession(activityId, handleLiveUpdate);
+
+      // Finish Workout Button
+      document.getElementById("finish-workout-btn").addEventListener("click", () => {
+        const sessionId = stopLiveSession();
+        window.location.href = sessionId ? `report.html?session=${sessionId}` : "report.html";
+      });
+
+      // Tabs Setup
+      const camTabBtn = document.getElementById("tab-camera-btn");
+      const uploadTabBtn = document.getElementById("tab-upload-btn");
+      const camPanel = document.getElementById("tab-camera-panel");
+      const uploadPanel = document.getElementById("tab-upload-panel");
+
+      camTabBtn.addEventListener("click", () => {
+        camTabBtn.classList.add("active");
+        uploadTabBtn.classList.remove("active");
+        camPanel.hidden = false;
+        uploadPanel.hidden = true;
+        startLiveSession(activityId, handleLiveUpdate);
+      });
+
+      uploadTabBtn.addEventListener("click", () => {
+        uploadTabBtn.classList.add("active");
+        camTabBtn.classList.remove("active");
+        uploadPanel.hidden = false;
+        camPanel.hidden = true;
+        stopLiveSession();
+      });
+
+      // Upload Form Setup
+      const uploadForm = document.getElementById("upload-form");
+      const fileInput = document.getElementById("video-file-input");
+      const uploadErr = document.getElementById("upload-error");
+      const progressBox = document.getElementById("upload-progress-container");
+      const progressMsg = document.getElementById("progress-message");
+      const progressPct = document.getElementById("progress-percent");
+      const progressFill = document.getElementById("progress-bar-fill");
+      const uploadSubmitBtn = document.getElementById("upload-submit-btn");
+
+      uploadForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        uploadErr.hidden = true;
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        progressBox.hidden = false;
+        uploadSubmitBtn.disabled = true;
+
+        try {
+          const sessionId = await uploadAndAnalyzeVideo(file, activityId, ({ percent, message }) => {
+            progressFill.style.width = `${percent}%`;
+            progressPct.textContent = `${percent}%`;
+            progressMsg.textContent = message;
+          });
+
+          window.location.href = `report.html?session=${sessionId}`;
+        } catch (err) {
+          uploadErr.textContent = err.message;
+          uploadErr.hidden = false;
+          progressBox.hidden = true;
+          uploadSubmitBtn.disabled = false;
+        }
+      });
+    }
+
+    function handleLiveUpdate(update) {
+      if (update.error) {
+        const errEl = document.getElementById("camera-error");
+        errEl.textContent = update.error;
+        errEl.hidden = false;
+        return;
+      }
+
+      if (update.rep_count !== undefined) {
+        document.getElementById("hud-reps").textContent = update.rep_count;
+      }
+      if (update.phase) {
+        document.getElementById("hud-phase").textContent = update.phase.toUpperCase();
+      }
+      if (update.risk_level) {
+        const badge = document.getElementById("hud-risk-badge");
+        const r = update.risk_level.toUpperCase();
+        badge.textContent = r === "HIGH" ? "Risky" : (r === "MODERATE" ? "Fix Needed" : "Good Form");
+        badge.className = `badge ${r === "HIGH" ? "badge-risky" : (r === "MODERATE" ? "badge-fix" : "badge-good")}`;
+      }
+      if (update.cue) {
+        document.getElementById("hud-cue").textContent = update.cue;
+      }
+      if (update.landmarks_ok === false) {
+        document.getElementById("hud-cue").textContent = "Step back so your whole body is visible";
+      }
+    }
+
+    init();
+  </script>
 </body>
 </html>
