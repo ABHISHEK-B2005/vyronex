@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign Up | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">VYRONEX</a>
+      <nav>
+        <span style="font-size: 0.95rem; color: var(--muted);">Already registered? <a href="login.html">Log in here</a></span>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 1040px; padding-top: 36px;">
+    <div class="signup-layout">
+      <!-- Blue Headline Panel -->
+      <div style="background: var(--blue); color: var(--white); padding: 36px 32px; border-radius: var(--radius-lg); position: relative; border-left: 8px solid var(--yellow); box-shadow: var(--shadow-md);">
+        <h1 style="color: var(--white); font-size: 2.2rem; margin-bottom: 16px;">Make Every Rep Count.</h1>
+        <p style="font-size: 1.05rem; opacity: 0.95; line-height: 1.6; margin-bottom: 24px;">
+          Create your account to unlock AI-powered movement assessment, instant audio cues, and injury prevention metrics tailored to your sport.
+        </p>
+
+        <div style="background: rgba(255, 255, 255, 0.12); padding: 18px; border-radius: var(--radius-md); font-size: 0.92rem;">
+          <strong style="color: var(--yellow);">🔒 Privacy Note:</strong><br>
+          Camera video stays on your device. Uploaded clips are sent for analysis; we save only joint measurements.
+        </div>
+      </div>
+
+      <!-- Signup Card -->
+      <div class="card" style="margin-bottom: 0;">
+        <h2 style="margin-bottom: 6px;" class="title-accent">Create Your Account</h2>
+        <p style="color: var(--muted); font-size: 0.92rem; margin-bottom: 20px;">A few details to calibrate your screening profile.</p>
+
+        <div id="signup-error" class="alert-error" role="alert" hidden></div>
+
+        <form id="signup-form">
+          <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" required maxlength="120" placeholder="e.g., Alex Johnson" autocomplete="name">
+          </div>
+
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" required maxlength="254" placeholder="alex@example.com" autocomplete="email">
+          </div>
+
+          <div class="signup-password-fields">
+            <div class="form-group">
+              <label for="password">Password</label>
+              <input type="password" id="password" name="password" required minlength="8" placeholder="At least 8 chars" autocomplete="new-password">
+            </div>
+            <div class="form-group">
+              <label for="confirm-password">Confirm Password</label>
+              <input type="password" id="confirm-password" name="confirm_password" required minlength="8" placeholder="Re-enter password" autocomplete="new-password">
+            </div>
+          </div>
+
+          <!-- Role Cards -->
+          <div class="form-group">
+            <label>I am training as:</label>
+            <div class="role-grid" style="margin-top: 6px;">
+              <label class="role-card selected" id="role-gym-label">
+                <input type="radio" name="role" value="gym" checked>
+                <strong>Home Workout / Gym</strong>
+                <span>Strength, squats, lunges & general fitness</span>
+              </label>
+              <label class="role-card" id="role-athlete-label">
+                <input type="radio" name="role" value="athlete">
+                <strong>Track & Field Athlete</strong>
+                <span>Jumping, throwing & event technique standards</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- Optional Biometrics -->
+          <div class="responsive-fields">
+            <div class="form-group">
+              <label for="age">Age <span style="font-weight: 400; color: var(--muted);">(opt)</span></label>
+              <input type="number" id="age" name="age" min="13" max="120" placeholder="24">
+            </div>
+            <div class="form-group">
+              <label for="height_cm">Height cm <span style="font-weight: 400; color: var(--muted);">(opt)</span></label>
+              <input type="number" id="height_cm" name="height_cm" min="100" max="250" placeholder="178">
+            </div>
+            <div class="form-group">
+              <label for="weight_kg">Weight kg <span style="font-weight: 400; color: var(--muted);">(opt)</span></label>
+              <input type="number" id="weight_kg" name="weight_kg" min="30" max="300" placeholder="72">
+            </div>
+          </div>
+
+          <!-- Data Consent Toggle -->
+          <div style="display: flex; gap: 12px; align-items: flex-start; margin: 16px 0 24px;">
+            <input type="checkbox" id="data_consent" name="data_consent" style="width: 20px; height: 20px; accent-color: var(--red); margin-top: 2px;">
+            <label for="data_consent" style="font-size: 0.88rem; color: var(--ink); cursor: pointer;">
+              <strong>Allow my anonymized movement data to improve the model</strong><br>
+              <span style="color: var(--muted); font-size: 0.82rem;">Off by default. We store joint features only (no raw video). You can withdraw consent anytime.</span>
+            </label>
+          </div>
+
+          <button type="submit" id="submit-btn" class="btn btn-primary" style="width: 100%;">Create Account</button>
+        </form>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { apiFetch, setToken } from "./assets/js/auth.js";
+
+    // Update selected role card style
+    const gymLabel = document.getElementById("role-gym-label");
+    const athleteLabel = document.getElementById("role-athlete-label");
+    document.querySelectorAll('input[name="role"]').forEach(radio => {
+      radio.addEventListener("change", () => {
+        if (radio.value === "gym") {
+          gymLabel.classList.add("selected");
+          athleteLabel.classList.remove("selected");
+        } else {
+          athleteLabel.classList.add("selected");
+          gymLabel.classList.remove("selected");
+        }
+      });
+    });
+
+    // Check query params for preselected role
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("role") === "athlete") {
+      const radio = document.querySelector('input[value="athlete"]');
+      if (radio) {
+        radio.checked = true;
+        radio.dispatchEvent(new Event("change"));
+      }
+    }
+
+    // Form submit
+    const form = document.getElementById("signup-form");
+    const errorEl = document.getElementById("signup-error");
+    const btn = document.getElementById("submit-btn");
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      errorEl.hidden = true;
+
+      const fd = new FormData(form);
+      const password = fd.get("password");
+      const confirmPassword = fd.get("confirm_password");
+
+      if (password !== confirmPassword) {
+        errorEl.textContent = "Passwords do not match.";
+        errorEl.hidden = false;
+        return;
+      }
+
+      const payload = {
+        name: fd.get("name").trim(),
+        email: fd.get("email").trim(),
+        password,
+        role: fd.get("role"),
+        data_consent: fd.get("data_consent") === "on",
+      };
+
+      if (fd.get("age")) payload.age = parseInt(fd.get("age"), 10);
+      if (fd.get("height_cm")) payload.height_cm = parseFloat(fd.get("height_cm"));
+      if (fd.get("weight_kg")) payload.weight_kg = parseFloat(fd.get("weight_kg"));
+
+      btn.disabled = true;
+      btn.innerHTML = `<span class="spinner"></span> Creating account...`;
+
+      try {
+        const res = await apiFetch("/api/auth/signup", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        setToken(data.access_token);
+
+        const target = payload.role === "gym" ? "gym.html" : "athlete.html";
+        window.location.assign(target);
+      } catch (err) {
+        errorEl.textContent = err.message;
+        errorEl.hidden = false;
+        btn.disabled = false;
+        btn.textContent = "Create Account";
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VYRONEX — AI Injury-Risk & Movement Screening</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script type="module" src="assets/js/guard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand" href="index.html">VYRONEX</a>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="login.html">Log In</a></li>
+          <li><a href="signup.html" class="btn btn-primary btn-sm">Get Started</a></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content" style="max-width: 900px; text-align: center; padding-top: 48px;">
+    <div style="margin-bottom: 24px;">
+      <span class="badge badge-info" style="margin-bottom: 12px;">Computer Vision Screening Aid</span>
+      <h1 style="font-size: clamp(2rem, 5vw, 3.2rem); margin-bottom: 16px;">
+        Train with Precision.<br>
+        <span class="title-accent">Prevent Joint Overload.</span>
+      </h1>
+      <p style="font-size: 1.15rem; color: var(--muted); max-width: 650px; margin: 0 auto 32px;">
+        Check squat form with your camera or upload a video to review another movement. Your video stays on your device; only joint measurements are sent for analysis.
+      </p>
+    </div>
+
+    <!-- Role Card Selection -->
+    <div class="card" style="text-align: left; padding: 32px; margin-top: 24px;">
+      <h2 style="margin-bottom: 8px;">Choose your training pathway</h2>
+      <p style="color: var(--muted); margin-bottom: 24px;">Select how you plan to use Vyronex to access tailored movement screening models.</p>
+
+      <div class="role-grid">
+        <a href="signup.html?role=gym" class="role-card" style="text-decoration: none;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">🏋️</div>
+          <strong>Home Workout & Gym</strong>
+          <span>Squat camera and video analysis. Other movement analyzers are not available yet.</span>
+          <div style="margin-top: 16px; color: var(--red); font-weight: 700; font-size: 0.9rem;">Start Gym Training &rarr;</div>
+        </a>
+
+        <a href="signup.html?role=athlete" class="role-card" style="text-decoration: none;">
+          <div style="font-size: 2.2rem; margin-bottom: 8px;">🏃‍♂️</div>
+          <strong>Athletics & Track/Field</strong>
+          <span>Explore event instructions; video analysis for these events is not available yet.</span>
+          <div style="margin-top: 16px; color: var(--blue-deep); font-weight: 700; font-size: 0.9rem;">Start Athlete Screening &rarr;</div>
+        </a>
+      </div>
+
+      <div class="info-banner" style="margin-bottom: 0;">
+        <strong>Privacy First:</strong> Camera video is processed locally in your browser. Uploaded clips are sent for analysis; we save only joint measurements.
+      </div>
+    </div>
+  </main>
+
+  <footer style="text-align: center; padding: 24px; color: var(--muted); font-size: 0.85rem; border-top: 1px solid var(--line); margin-top: auto; background: #fff;">
+    &copy; 2026 VYRONEX Platform &bull; Movement-risk screening only, not a medical diagnosis.
+  </footer>
+</body>
+</html>

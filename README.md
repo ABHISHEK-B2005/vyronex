@@ -1,116 +1,178 @@
-# VYRONEX — AI Fitness & Athletics Performance Platform
+# VYRONEX — Biomechanical Screening & Movement Risk Platform
 
-Two real parts:
+VYRONEX is an end-to-end computer-vision and machine-learning platform for biomechanical movement-risk screening, kinematics tracking, coach supervision, and longitudinal athletic analytics.
 
-- **frontend/** — a static, multi-page site. Runs in the browser, captures
-  webcam video or an uploaded file, runs MediaPipe Pose to get a 33-point
-  skeleton, and either calls the backend (Squat) or a local heuristic
-  engine (everything else) to turn that into scores and feedback.
-- **backend/** — a real Python (FastAPI) server, unchanged from the
-  original prototype's `src/`: squat rep/phase detection, 5-factor
-  scoring, risk engine, feedback generator.
+---
 
-## Mandatory flow
-
-**Category → Activity → Live Feed / Video Upload → Analysis → Results**
-
-Only three pages live in the main navigation — **Home, Gym, Athletics**.
-Live Feed, Video Upload and Results are intentionally *not* separate nav
-pages: they're steps that unlock inside `activity.html` only after a
-specific workout or event has been selected from Gym or Athletics, and
-the Result is shown inline at the end of that same flow. `activity.html`
-checks for a `?activity=` query param; if it's missing or invalid it
-shows a "Select an Activity First" screen with links back into Gym /
-Athletics — it never falls through to a camera or upload UI.
-
-There is no visible backend-URL/connection control in the UI — the
-Squat engine talks to the backend at a fixed `http://localhost:8000`
-internally.
-
-## Pages
-
-| Page | File | Purpose |
-|---|---|---|
-| Home | `index.html` | Welcome + GYM / ATHLETICS category picker |
-| Gym | `gym.html` | Choose Your Workout: Push Up · Squat · Walking Lunges |
-| Athletics | `athletics.html` | Choose Your Event: Long Jump · Shot Put · Javelin Throw |
-| *(no nav link)* | `activity.html?activity=<id>` | Instructions → method choice → Live Feed / Video Upload → Performance Results, all scoped to that one activity — reached only via a card on Gym or Athletics |
-
-## Scalable architecture
-
-Every workout/event is **one entry** in `frontend/assets/activities.js`
-(`VYRONEX_ACTIVITIES`) — label, icon, instructions, which engine it uses,
-and which metrics/measurements it reports. Nothing else in the app
-hard-codes an activity name; `gym.html`/`athletics.html` render their
-cards by looping the registry, and `activity.html` reads the chosen
-activity's config to decide what UI, engine and result fields to show.
-Adding a new workout or event means adding one object to the registry
-(and, if it needs bespoke detection logic, one small method on
-`HeuristicAnalyzer`) — not rebuilding pages.
-
-## Two analysis engines
-
-- **`backend-squat`** (Squat only) — real Python pipeline via
-  `/api/session/*` and `/api/frame`, unchanged from the original
-  prototype.
-- **`heuristic`** (Push Up, Walking Lunges, Long Jump, Shot Put, Javelin
-  Throw) — `frontend/assets/heuristic-engine.js`, a client-side
-  pose-geometry engine. It computes real joint angles and velocities
-  from tracked landmarks (elbow/knee angles for rep counting, wrist
-  velocity for release speed and angle, hip trajectory for jump
-  distance/flight time, etc.) and turns them into the same
-  score/risk/checklist/feedback shape the backend uses — so the UI can
-  render any activity generically. It is explicitly labeled a
-  **heuristic prototype engine** in the UI, not a certified or
-  clinically validated measurement tool, same spirit as the backend's
-  own disclaimer. Distance and speed for athletics events are reported
-  in relative/normalized units (body-lengths, rel. units/s) since there
-  is no calibrated real-world reference scale from a single camera.
-
-## How to run it
+## 🏗 System Architecture
 
 ```
+                                +-----------------------------------+
+                                |        Athlete / Gym User         |
+                                |       Browser / Mobile Client     |
+                                +-----------------+-----------------+
+                                                  |
+                         WebSockets / REST API    |   MediaPipe Pose (3D World + 2D Image Landmarks)
+                                                  v
++---------------------------------------------------------------------------------------------------+
+|                                    VYRONEX BACKEND (FastAPI)                                      |
+|                                                                                                   |
+|  +---------------------+   +---------------------+   +--------------------+   +----------------+  |
+|  | Auth & Consent      |   | Video Processor     |   | Risk Engine        |   | Report Builder |  |
+|  | (JWT, RBAC, Data Del|   | (OpenCV, MediaPipe) |   | (Rule + ML + SHAP) |   | & PDF Exporter |  |
+|  +---------------------+   +---------------------+   +--------------------+   +----------------+  |
+|                                                                                                   |
+|  +---------------------+   +---------------------+   +--------------------+   +----------------+  |
+|  | AI Coach Assistant  |   | Athletics Reference |   | Expert Review      |   | Safe Retrain   |  |
+|  | (Anthropic Claude)  |   | Profiles (Z-Scores) |   | Queue (Physio/Coach|   | (GroupKFold)   |  |
+|  +---------------------+   +---------------------+   +--------------------+   +----------------+  |
++-------------------------------------------------+-------------------------------------------------+
+                                                  |
+                                                  v
+                                      +-----------------------+
+                                      |   MongoDB Database    |
+                                      | (Sessions, Reps, User |
+                                      +-----------------------+
+```
+
+---
+
+## 🌟 Key Capabilities & Module Overview
+
+### 1. Multi-Modal Analysis
+- **Live Stream (`/ws/live`)**: Sub-second feedback using in-browser MediaPipe pose estimation streamed over WebSockets.
+- **Video Upload (`/api/upload/analyze`)**: Processes every decoded frame with exact `frame_index / fps` timestamps, smooths MediaPipe world landmarks, detects camera view, and deletes the uploaded video after analysis. Joint coordinates and per-frame diagnostic metadata are retained for report recalculation.
+- **Upload Diagnostics**: `/api/upload/debug/{session_id}` provides per-frame JSON or `?format=csv`; `POST /api/upload/recompute/{session_id}` rebuilds reps and reports from saved pose landmarks.
+- **View-aware checks**: Front view scores knee alignment and symmetry; side view scores squat depth and torso lean; angled view scores depth only. Tune view thresholds (`0.55` front, `0.30` side), 25% maximum knee drift, and the 30% unusable-frame limit in `backend/src/config.py`.
+- **Body alignment**: Smoothed 3D pose frames produce front- or side-view alignment metrics. Unavailable metrics remain `None`/“Not assessed”; alignment scores average assessed metrics only. Tune score bands and per-metric limits in `backend/src/config.py`. Live responses include `view` and `alignment`; each stored rep and report includes its alignment summary.
+  - Tunable defaults: front/side view ratios `0.55`/`0.30`; status bands Good `>=80`, Watch `>=60`; knee drift `0.08` leg length; shoulder/hip tilt `8°`; knee-angle difference `12°`; torso lean `40°`; neck-torso deviation `20°`; knee-over-toe `0.15` leg length; ankle/hip width target `1.0` (tolerance `0.60`); bottom knee angle target `90°` (tolerance `60°`).
+
+### 2. Biomechanical Risk & SHAP Explanations
+- **Person-Wise Trained Classifiers**: Cross-validated with `GroupKFold` on participant IDs (`person_id`) to prevent data leakage.
+- **Interpretability**: Real-time SHAP feature attributions explaining the top 3 kinematic factors driving elevated risk predictions.
+- **Athletics Reference Profiles**: Z-score deviation scoring against coach-approved biomechanical standards for **Long Jump**, **Shot Put**, and **Javelin Throw**.
+
+### 3. Human-in-the-Loop Supervision & Safe Retraining
+- **Athlete Rating Feedback**: Athletes can flag incorrect ratings (`POST /api/feedback/rep/{rep_id}`).
+- **Expert Review Queue (`expert.html`)**: Coaches and physiotherapists review disputed reps and low-confidence predictions (`< 60%`), assigning verified ground-truth labels.
+- **Champion-Challenger Safe Retraining**: Challenger models are evaluated against the active champion on held-out benchmarks. If high-risk recall regresses, the candidate is automatically rejected and logged.
+
+### 4. AI Biomechanical Coach (`coach.html`)
+- **Interactive Chat Assistant**: Biomechanical assistant with full athlete history context.
+- **Corrective Exercise Library**: Targeted drills mapped by joint area (`knee`, `lower_back`, `shoulder`, `ankle`, `hip`, `elbow`).
+- **Safety Boundaries**: Strictly enforces medical disclaimers, never diagnoses injuries, and refers users to licensed professionals for joint pain.
+
+### 5. Comprehensive Clinical & Coach Reports (`report.html`)
+- **Non-Overlapping Metric Accounting**: Exact distribution: `correct + defective + high_risk = total_reps`.
+- **Fatigue Progression**: First half vs. second half form score drop percentage.
+- **Interactive Body Map**: Dynamic SVG mapping high-risk stress points across joint chains.
+- **PDF Export**: Downloadable reports generated with ReportLab and Matplotlib (`GET /api/reports/{session_id}/pdf`).
+
+### 6. Longitudinal Progress & Trend Tracking (`history.html`)
+- **Recurring Weakness Detection**: Automatically surfaces chronic joint loading issues across sessions.
+- **Screening Risk Forecast**: Early indicator combining fatigue decay, frequency, and defect consistency.
+- **Gamification**: Streaks and milestone achievement badges.
+
+---
+
+## 🚀 Quick Start Guide
+
+### Prerequisites
+- Python 3.10+
+- Docker & Docker Compose (optional for containerized deployment)
+- Node.js or local HTTP server for static frontend
+
+### Option A: Local Development Run
+
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/ABHISHEK-B2005/vyronex.git
+   cd vyronex
+   ```
+
+2. **Set up backend:**
+   ```bash
+   cd backend
+   python -m venv venv
+   # Windows
+   .\venv\Scripts\activate
+   # Linux/macOS
+   source venv/bin/activate
+
+   pip install -r requirements.txt
+   uvicorn app:app --reload --port 8000
+   ```
+
+3. **Open Frontend:**
+   - In a separate terminal:
+     ```bash
+     cd frontend
+     python -m http.server 8080
+     ```
+   - Open your browser at `http://localhost:8080/login.html`
+
+---
+
+### Option B: Docker Compose Deployment
+
+```bash
+docker-compose up --build
+```
+The FastAPI backend will be available at `http://localhost:8000` connected to MongoDB on port 27017.
+
+---
+
+## 📡 Core API Reference
+
+| Method | Endpoint | Role / Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/signup` | Public | Create account with role (`gym`, `athlete`, `expert`) & opt-in consent |
+| `POST` | `/api/auth/login` | Public | Authenticate and retrieve JWT access token |
+| `DELETE`| `/api/auth/data` | Authenticated | Withdraw consent and wipe stored movement features |
+| `POST` | `/api/upload/analyze` | Authenticated | Upload video for background computer vision analysis |
+| `GET`  | `/api/upload/status/{job_id}` | Authenticated | Poll video analysis job progress |
+| `GET`  | `/api/upload/debug/{session_id}` | Authenticated | Inspect per-frame pose metrics; add `?format=csv` to export |
+| `POST` | `/api/upload/recompute/{session_id}` | Authenticated | Rebuild rep results and report from saved pose landmarks |
+| `POST` | `/api/feedback/rep/{rep_id}` | Authenticated | Submit rep rating validation ("Was this rating correct?") |
+| `GET`  | `/api/expert/queue` | `expert` | Fetch review queue of disputed and low-confidence reps |
+| `POST` | `/api/expert/label/{rep_id}`| `expert` | Coach/physio sets true ground-truth label |
+| `POST` | `/api/expert/retrain` | `expert` | Execute safe champion-challenger model retraining |
+| `GET`  | `/api/expert/versions` | `expert` | List model version registry and activation history |
+| `POST` | `/api/coach/chat` | Authenticated | Biomechanical chat assistant (rate-limited) |
+| `GET`  | `/api/coach/recommendations/{session_id}` | Authenticated | Post-workout corrective drills |
+| `GET`  | `/api/reports/{session_id}` | Authenticated | Fetch full session report & analytics |
+| `GET`  | `/api/reports/{session_id}/pdf` | Authenticated | Download clinical PDF report |
+| `GET`  | `/api/alignment/summary?activity=&days=30` | Authenticated | Alignment score trend and recurring body-area issues |
+| `GET`  | `/api/history` | Authenticated | Filterable session history, trends, and risk forecast |
+
+---
+
+## 🧪 Testing
+
+Run the comprehensive test suite with Python unittest:
+
+```bash
 cd backend
-python3 -m venv venv && source venv/bin/activate   # optional
-pip install -r requirements.txt
-uvicorn app:app --reload --port 8000
-```
-Then open `frontend/index.html` in a browser (or `cd frontend && python3
--m http.server 8080` if your browser restricts camera access on
-`file://`). The backend is only required for **Squat** — every other
-activity works with the backend offline (Live Feed still needs a
-webcam; Video Upload needs neither backend nor camera).
-
-## Project structure
-```
-VYRONEX/
-├── README.md
-├── frontend/
-│   ├── index.html        ← Home (GYM | ATHLETICS)
-│   ├── gym.html            ← Choose Your Workout
-│   ├── athletics.html      ← Choose Your Event
-│   ├── activity.html       ← gated dynamic flow for one activity (not in main nav)
-│   └── assets/
-│       ├── style.css          ← shared VYRONEX design system
-│       ├── logo.svg           ← VYRONEX logo / favicon
-│       ├── activities.js      ← activity registry (single source of truth)
-│       ├── heuristic-engine.js← client-side pose-geometry engine
-│       └── results-render.js  ← shared Performance Results renderers
-└── backend/                 ← unchanged Python analysis pipeline (Squat)
+python -m unittest discover tests
 ```
 
-## Honest limitations
+For targeted alignment regressions, run `python -m pytest tests/test_video_processor.py tests/test_coach_and_reports.py`.
 
-- Only **Squat** is backed by the validated Python pipeline. Every other
-  activity's numbers come from a client-side heuristic prototype — real
-  measurements from real tracked landmarks, but not clinically validated
-  and clearly labeled as such in the UI.
-- Athletics distance/speed figures are relative, uncalibrated estimates
-  (no reference object or multi-camera setup to convert to real units).
-- Single-camera 2D pose tracking loses depth information, so any motion
-  toward/away from the camera is undercounted.
-- The backend URL is fixed to `http://localhost:8000` in the frontend
-  code (no in-UI connection control) — edit `backendUrl()` in
-  `activity.html` if you need to point it elsewhere.
-- Movement-risk screening only, not a medical, coaching-certification,
-  or athletics-officiating tool.
+### Real-clip alignment check
+
+Use four squat clips with a fixed camera, good light, and the whole body visible:
+
+1. **Front, good form:** face the camera and keep knees and shoulders balanced; expect front metrics assessed and mostly Good.
+2. **Front, knees-in:** perform controlled reps with a visible inward knee drift; expect knee alignment to change to Watch/Fix, not a tracking error.
+3. **Side, good form:** turn 90 degrees to the camera and squat with a comfortable upright torso; expect side metrics assessed and front-only metrics shown as not assessed.
+4. **Side, leaning:** repeat from the side with an obvious forward torso lean; expect torso alignment to be flagged.
+
+Compare the live panel and saved report. Repeat clips with feet/knees/hips occluded only as a tracking test; those metrics should be not assessed rather than shown as zero.
+
+---
+
+## ⚠️ Honest Technical & Clinical Limitations
+
+1. **Movement-Risk Screening Only**: VYRONEX is a biomechanical coaching and injury-risk screening aid. It is **NOT** a medical diagnostic tool or medical device. All thresholds and risk indicators are prototype engineering approximations.
+2. **2D Single-Camera Perspective**: Monocular 2D pose estimation is sensitive to camera positioning, parallax, loose clothing, and occlusions. Standardized camera angles (45° oblique or sagittal) yield the most reliable kinematic measurements.
+3. **Hardware Independence**: Smart Ring readings are currently simulated in demo mode; physical Bluetooth Smart Ring device pairing requires manufacturer SDK integration.

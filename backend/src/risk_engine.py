@@ -68,12 +68,16 @@ class RuleBasedRiskEngine:
 
     def assess(self, form_scores: FormScores, features: RepFeatures) -> RiskResult:
         contributions: Dict[str, float] = {}
+        assessed_weight = 0.0
         for category, weight in RISK_WEIGHTS.items():
             form_value = getattr(form_scores, category)
+            if form_value is None:
+                continue
+            assessed_weight += weight
             deficiency = 100.0 - form_value  # how "bad" this category is
             contributions[category] = round(deficiency * weight, 2)
 
-        risk_score = round(sum(contributions.values()), 1)
+        risk_score = round(sum(contributions.values()) / assessed_weight, 1) if assessed_weight else 0.0
         risk_score = max(0.0, min(100.0, risk_score))
         risk_level = classify_risk_score(risk_score)
         risk_label = RISK_LABELS[risk_level]
@@ -120,27 +124,34 @@ class MLRiskEngine:
             "movement_speed": features.movement_speed,
             "rep_duration": features.rep_duration,
         }
-        label, probabilities = self._predictor.predict(feature_dict)
+        pred_res = self._predictor.predict(feature_dict)
+        if len(pred_res) == 3:
+            label, probabilities, explanations = pred_res
+        else:
+            label, probabilities = pred_res
+            explanations = []
 
         # Map classifier probability of risk to a 0-100 continuous score
-        # for display consistency with the rule-based engine.
-        risk_prob = probabilities.get("HIGH_RISK", 0.0) * 1.0 + probabilities.get(
-            "MODERATE_RISK", 0.0
+        risk_prob = probabilities.get("HIGH", probabilities.get("HIGH_RISK", 0.0)) * 1.0 + probabilities.get(
+            "MODERATE", probabilities.get("MODERATE_RISK", 0.0)
         ) * 0.5
         risk_score = round(risk_prob * 100.0, 1)
-        risk_level = classify_risk_score(risk_score) if label == "SAFE" else (
-            "HIGH" if label == "HIGH_RISK" else "MODERATE"
-        )
+        risk_level = "LOW" if label in ("LOW", "SAFE") else ("HIGH" if label in ("HIGH", "HIGH_RISK") else "MODERATE")
         risk_label = RISK_LABELS[risk_level]
+
+        contributing = {"ml_predicted_class": label}
+        if explanations:
+            contributing["shap_top_factors"] = explanations
 
         return RiskResult(
             risk_score=risk_score,
             risk_level=risk_level,
             risk_label=risk_label,
-            contributing_factors={"ml_predicted_class": label},
-            primary_issue=None,
+            contributing_factors=contributing,
+            primary_issue=explanations[0]["feature"] if explanations else None,
             engine=self.name,
         )
+
 
 
 def get_risk_engine(mode: str = "rule_based"):

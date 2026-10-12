@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Training History & Progress | VYRONEX</title>
+  <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <script type="module" src="assets/js/guard.js"></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div style="display: flex; align-items: center; gap: 14px;">
+        <a class="brand" href="index.html">VYRONEX</a>
+        <span class="badge badge-info">PROGRESS & HISTORY</span>
+      </div>
+      <nav>
+        <ul class="nav-links">
+          <li><a href="javascript:history.back()">Back</a></li>
+          <li><a href="history.html" class="active">History</a></li>
+          <li><a href="coach.html">Coach</a></li>
+          <li><a href="profile.html">Profile</a></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm">Log Out</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="main-content">
+    <div id="history-error" class="alert-error" role="alert" hidden></div>
+
+    <div style="margin-bottom: 24px;">
+      <span class="eyebrow" style="color: var(--muted); font-size: 0.85rem; font-weight: 600;">LONGITUDINAL ANALYTICS</span>
+      <h1 class="title-accent" style="margin-top: 4px;">Training History & Form Trends</h1>
+    </div>
+
+    <!-- Recurring Weakness Card -->
+    <div id="recurring-weakness-card" class="card" style="border-left: 5px solid var(--warn); background: var(--yellow-tint); margin-bottom: 24px;" hidden>
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <span style="font-size: 1.6rem;">⚠️</span>
+        <div>
+          <strong style="color: var(--yellow-badge-text); font-size: 1.05rem;">Recurring Biomechanical Weakness Detected</strong>
+          <p id="recurring-weakness-text" style="color: var(--ink); font-size: 0.92rem; margin-top: 2px;">
+            Lower back flagged in 4 of your last 5 sessions.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filter Form -->
+    <div class="card" style="padding: 18px 24px; margin-bottom: 24px;">
+      <form id="history-filter-form" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-end;">
+        <div style="flex: 1; min-width: 160px;">
+          <label for="filter-activity" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">Activity</label>
+          <select id="filter-activity">
+            <option value="">All Activities</option>
+            <option value="squat">Bodyweight Squat</option>
+            <option value="pushup">Push-Up</option>
+            <option value="lunge">Walking Lunge</option>
+            <option value="plank">Plank</option>
+            <option value="long_jump">Long Jump</option>
+            <option value="shot_put">Shot Put</option>
+            <option value="javelin">Javelin</option>
+          </select>
+        </div>
+
+        <div style="flex: 1; min-width: 140px;">
+          <label for="filter-from" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">From Date</label>
+          <input type="date" id="filter-from">
+        </div>
+
+        <div style="flex: 1; min-width: 140px;">
+          <label for="filter-to" style="display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">To Date</label>
+          <input type="date" id="filter-to">
+        </div>
+
+        <div>
+          <button type="submit" class="btn btn-secondary" style="min-height: 48px;">Apply Filter</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Accuracy Trend Chart -->
+    <div class="card" style="margin-bottom: 28px;">
+      <h3 class="card-title">Accuracy % Over Time</h3>
+      <div style="height: 220px; position: relative;">
+        <canvas id="accuracy-trend-chart"></canvas>
+      </div>
+    </div>
+
+    <!-- Session History Table -->
+    <div class="card" style="padding: 0; overflow: hidden;">
+      <div style="padding: 20px 24px; border-bottom: 1px solid var(--line);">
+        <h3 style="margin: 0;">Completed Workout Sessions</h3>
+      </div>
+      <div class="table-responsive" style="border: 0; border-radius: 0;">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Activity</th>
+              <th>Volume</th>
+              <th>Accuracy</th>
+              <th>Overall Risk</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody">
+            <tr><td colspan="6" style="text-align: center; color: var(--muted); padding: 20px;">Loading sessions...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { requireAuth } from "./assets/js/guard.js";
+    import { initHistoryPage } from "./assets/js/history.js";
+
+    async function init() {
+      const user = await requireAuth();
+      if (!user) return;
+      initHistoryPage();
+    }
+
+    init();
+  </script>
+</body>
+</html>

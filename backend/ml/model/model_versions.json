@@ -1,0 +1,205 @@
+[
+  {
+    "version": "v1.0.0",
+    "trained_at": "2026-10-06T04:05:46.066708+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 30,
+    "unique_persons": 1,
+    "metrics": {
+      "accuracy": 1.0,
+      "precision_macro": 1.0,
+      "recall_macro": 1.0,
+      "f1_macro": 1.0,
+      "high_risk_recall": 1.0,
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          10,
+          0
+        ],
+        [
+          0,
+          0,
+          10
+        ]
+      ],
+      "feature_importances": {
+        "knee_angle": 0.0,
+        "hip_angle": 0.2818,
+        "torso_angle": 0.2551,
+        "knee_alignment": 0.2388,
+        "symmetry": 0.2243,
+        "movement_speed": 0.0,
+        "rep_duration": 0.0
+      }
+    },
+    "active": true,
+    "model_file": "risk_squat.joblib"
+  },
+  {
+    "version": "v1.2.0",
+    "trained_at": "2026-10-06T05:16:23.795038+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.3.0",
+    "trained_at": "2026-10-06T05:18:03.955777+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.4.0",
+    "trained_at": "2026-10-06T05:21:37.185821+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.5.0",
+    "trained_at": "2026-10-06T05:31:43.827817+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.6.0",
+    "trained_at": "2026-10-06T05:32:44.744258+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.7.0",
+    "trained_at": "2026-10-06T05:47:44.324158+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.8.0",
+    "trained_at": "2026-10-06T08:19:21.862700+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.9.0",
+    "trained_at": "2026-10-06T08:22:10.275231+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.10.0",
+    "trained_at": "2026-10-06T08:29:36.977803+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.11.0",
+    "trained_at": "2026-10-06T09:46:34.338026+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  }
+]

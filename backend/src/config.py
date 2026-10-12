@@ -29,13 +29,39 @@ BOTTOM_KNEE_ANGLE = 110.0         # knee considered "deep" below this
 DESCEND_TRIGGER_DELTA = 8.0       # degrees dropped from standing to trigger descent
 ASCEND_TRIGGER_DELTA = 8.0        # degrees regained from bottom to trigger ascent
 MIN_FRAMES_IN_PHASE = 3           # smoothing: min consecutive frames before phase switch
+SQUAT_DOWN_ANGLE = 110.0
+SQUAT_UP_ANGLE = 160.0
+SQUAT_DESCENT_START_ANGLE = 160.0
+MIN_REP_DURATION_SECONDS = 0.8
+MIN_REP_SAMPLES = 8
+VIEW_FRONT_MIN_RATIO = 0.55
+VIEW_SIDE_MAX_RATIO = 0.30
+MAX_KNEE_DRIFT_LEG_RATIO = 0.25
+MAX_FRAME_JUMP_TORSO_RATIO = 0.45
+MAX_UNUSABLE_FRAME_SHARE = 0.30
+POSITION_SMOOTHING_ALPHA = 0.35
+POSITION_MEDIAN_WINDOW = 5
+
+# Alignment scores are prototype heuristics, not clinically validated.
+ALIGNMENT_GOOD_SCORE = 80.0
+ALIGNMENT_WATCH_SCORE = 60.0
+ALIGNMENT_MAX_KNEE_DRIFT_RATIO = 0.08
+ALIGNMENT_MAX_LEVEL_TILT_DEGREES = 8.0
+ALIGNMENT_MAX_WEIGHT_SHIFT_DEGREES = 12.0
+ALIGNMENT_IDEAL_ANKLE_HIP_WIDTH_RATIO = 1.0
+ALIGNMENT_MAX_ANKLE_HIP_WIDTH_DEVIATION = 0.60
+ALIGNMENT_MAX_TORSO_LEAN_DEGREES = 40.0
+ALIGNMENT_MAX_NECK_TORSO_DEGREES = 20.0
+ALIGNMENT_MAX_KNEE_OVER_TOE_RATIO = 0.15
+ALIGNMENT_IDEAL_BOTTOM_KNEE_ANGLE = 90.0
+ALIGNMENT_MAX_BOTTOM_KNEE_ANGLE_DEVIATION = 60.0
 
 # --------------------------------------------------------------------------
 # "Ideal" biomechanical reference ranges (prototype assumptions)
 # --------------------------------------------------------------------------
 IDEAL_MIN_KNEE_ANGLE: Tuple[float, float] = (80.0, 110.0)   # good squat depth range
-IDEAL_TORSO_ANGLE: Tuple[float, float] = (45.0, 90.0)       # degrees from horizontal; closer to 90 = upright
-MAX_KNEE_VALGUS_SHIFT_PX_RATIO = 0.08  # normalized inward-knee shift considered risky
+IDEAL_TORSO_ANGLE: Tuple[float, float] = (70.0, 90.0)       # degrees from horizontal; closer to 90 = upright
+MAX_KNEE_VALGUS_SHIFT_LEG_RATIO = 0.08  # inward knee shift as a fraction of hip-to-ankle length
 MAX_KNEE_SYMMETRY_DIFF = 12.0          # degrees difference between left/right knee angle
 MAX_HIP_SYMMETRY_DIFF = 12.0
 IDEAL_REP_DURATION: Tuple[float, float] = (1.2, 4.0)  # seconds; too fast/slow both penalized
@@ -111,6 +137,25 @@ MODEL_COLUMNS_PATH = "ml/model/feature_columns.json"
 # ML labels
 # --------------------------------------------------------------------------
 ML_LABELS = ["SAFE", "MODERATE_RISK", "HIGH_RISK"]
+
+# --------------------------------------------------------------------------
+# Rep Classification & Defect mapping
+# --------------------------------------------------------------------------
+REP_FORM_SCORE_CORRECT_MIN = 70.0
+
+DEFECT_BODY_AREA_MAP: Dict[str, str] = {
+    "knee_alignment": "knee",
+    "knee_depth": "knee, hip",
+    "back_posture": "lower_back",
+    "symmetry": "hip",
+    "movement_control": "full_chain",
+    "elbow flare (push-up)": "shoulder",
+    "elbow flare": "shoulder",
+    "elbow_flare": "shoulder",
+    "landing (long jump)": "ankle, knee",
+    "landing": "ankle, knee",
+    "landing_mechanics": "ankle, knee",
+}
 
 FEATURE_COLUMNS = [
     "knee_angle",
