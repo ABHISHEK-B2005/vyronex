@@ -122,6 +122,13 @@ class SessionServiceTests(unittest.TestCase):
             "risk": {"risk_level": "HIGH", "primary_issue": "back_posture"},
             "form_scores": {"knee_alignment": 82, "back_posture": 31},
             "features": {"min_knee_angle": 88, "forward_lean": 38},
+            "alignment": {
+                "overall": 84.0,
+                "status": "Good",
+                "metrics": [],
+                "issues": [],
+                "view": "side",
+            },
             "feedback": {"recommendation": "Torso leaned forward 38 degrees..."},
         }
         stored_rep = asyncio.run(
@@ -138,6 +145,8 @@ class SessionServiceTests(unittest.TestCase):
         self.assertEqual(stored["risk_level"], "HIGH")
         self.assertEqual(stored["form_scores"], {"knee_alignment": 82, "back_posture": 31})
         self.assertEqual(stored["features"], {"min_knee_angle": 88, "forward_lean": 38})
+        self.assertEqual(stored["alignment"]["overall"], 84.0)
+        self.assertEqual(stored["camera_view"], "side")
         self.assertEqual(stored["feedback"], "Torso leaned forward 38 degrees...")
         self.assertEqual(stored["user_id"], "user-1")
         self.assertIn("status", stored)
@@ -224,7 +233,7 @@ class SessionServiceTests(unittest.TestCase):
         query, update = self.database.sessions.updates[0]
         self.assertEqual(query, {"_id": "session-1", "user_id": "user-1"})
         self.assertEqual(update["$set"]["avg_form_score"], 71.7)
-        self.assertEqual(update["$set"]["overall_risk"], "low")
+        self.assertEqual(update["$set"]["overall_risk"], "moderate")
         self.assertIsNotNone(update["$set"]["ended_at"])
         self.assertEqual(result["total_reps"], 3)
         self.assertEqual(result["average_form_score"], 71.7)

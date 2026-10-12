@@ -18,6 +18,10 @@ export async function initHistoryPage() {
 }
 
 async function fetchHistory() {
+  const errorEl = document.getElementById("history-error");
+  const tbody = document.getElementById("history-tbody");
+  if (errorEl) errorEl.hidden = true;
+  if (tbody) tbody.innerHTML = `<tr><td colspan="6" role="status" style="text-align: center; padding: 24px;"><span class="spinner" aria-hidden="true"></span> Loading sessions...</td></tr>`;
   const activity = document.getElementById("filter-activity")?.value || "";
   const fromDate = document.getElementById("filter-from")?.value || "";
   const toDate = document.getElementById("filter-to")?.value || "";
@@ -34,11 +38,11 @@ async function fetchHistory() {
     const data = await res.json();
     renderHistoryData(data);
   } catch (err) {
-    const errEl = document.getElementById("history-error");
-    if (errEl) {
-      errEl.textContent = `Error loading history: ${err.message}`;
-      errEl.hidden = false;
+    if (errorEl) {
+      errorEl.textContent = `Error loading history: ${err.message}`;
+      errorEl.hidden = false;
     }
+    if (tbody) tbody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 24px;">Your session history could not be loaded.</td></tr>`;
   }
 }
 
@@ -71,20 +75,21 @@ function renderHistoryData(data) {
   }
 
   tbody.innerHTML = sessions.map(s => {
-    const risk = (s.overall_risk || "LOW").toUpperCase();
+    const risk = String(s.overall_risk || "LOW").toUpperCase();
     const isRisky = risk === "HIGH";
     const isFix = risk === "MODERATE";
     const badgeClass = isRisky ? "badge-risky" : (isFix ? "badge-fix" : "badge-good");
-    const badgeWord = isRisky ? "Risky" : (isFix ? "Fix" : "Good");
+    const badgeWord = isRisky ? "High risk" : (isFix ? "Watch your form" : "Good");
+    const sessionId = encodeURIComponent(s.session_id || "");
 
     return `
       <tr>
-        <td>${s.date}</td>
-        <td><strong>${escapeHtml(s.activity.toUpperCase())}</strong></td>
-        <td>${s.total_reps} reps</td>
-        <td><strong>${s.accuracy_pct}%</strong></td>
+        <td>${escapeHtml(s.date)}</td>
+        <td><strong>${escapeHtml(String(s.activity || "Activity").toUpperCase())}</strong></td>
+        <td>${escapeHtml(s.total_reps)} reps</td>
+        <td><strong>${escapeHtml(s.accuracy_pct)}%</strong></td>
         <td><span class="badge ${badgeClass}">${badgeWord}</span></td>
-        <td><a href="report.html?session=${s.session_id}" class="btn btn-secondary btn-sm">View Report</a></td>
+        <td><a href="report.html?session=${sessionId}" class="btn btn-secondary btn-sm">View Report</a></td>
       </tr>
     `;
   }).join("");

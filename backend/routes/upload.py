@@ -8,6 +8,8 @@ Endpoints:
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import logging
 import os
 import shutil
@@ -25,11 +27,13 @@ from fastapi import (
     Form,
     HTTPException,
     Request,
+    Response,
     UploadFile,
     status,
 )
 
-from core.deps import get_current_user_optional
+from core.deps import get_current_user, get_current_user_optional
+from services.report_recompute import recompute_report
 from services.video_processor import (
     InvalidVideoFileError,
     NoPersonDetectedError,
@@ -70,11 +74,12 @@ async def _run_video_job(
     database: Any,
 ) -> None:
     """Worker function executed as a background task."""
-    processor = VideoProcessor(frame_step=2)
+    processor = VideoProcessor()
 
     def on_progress(percent: float) -> None:
         if job_id in _jobs:
             _jobs[job_id]["progress"] = percent
+            _jobs[job_id]["message"] = f"Analyzing video frames ({round(percent)}%)."
 
     try:
         result = await processor.process_video(
@@ -89,6 +94,7 @@ async def _run_video_job(
             _jobs[job_id].update({
                 "status": "completed",
                 "progress": 100.0,
+                "message": "Video analysis complete.",
                 "session_id": result["session_id"],
                 "report_id": result["report_id"],
                 "summary": result["summary"],
@@ -102,6 +108,7 @@ async def _run_video_job(
             _jobs[job_id].update({
                 "status": "failed",
                 "progress": 100.0,
+                "message": str(exc),
                 "error": str(exc),
                 "completed_at": time.time(),
             })
@@ -111,6 +118,7 @@ async def _run_video_job(
             _jobs[job_id].update({
                 "status": "failed",
                 "progress": 100.0,
+                "message": f"Video analysis failed: {exc}",
                 "error": str(exc),
                 "completed_at": time.time(),
             })
@@ -135,6 +143,13 @@ async def analyze_video(
     filename = file.filename or ""
     ext = Path(filename).suffix.lower()
     content_type = (file.content_type or "").lower()
+    normalized_activity = activity.strip().lower()
+
+    if normalized_activity != "squat":
+        raise HTTPException(
+            status_code=422,
+            detail="Reliable uploaded-video analysis currently supports squats only. Other activity analyzers are not available yet.",
+        )
 
     # Reject non-video formats immediately with 415
     if ext not in ALLOWED_EXTENSIONS or (content_type and content_type not in ALLOWED_MIME_TYPES and not content_type.startswith("video/")):
@@ -186,12 +201,13 @@ async def analyze_video(
         "job_id": job_id,
         "status": "processing",
         "progress": 0.0,
+        "message": "Upload received. Preparing video analysis.",
         "session_id": None,
         "report_id": None,
         "summary": None,
         "reps": None,
         "error": None,
-        "activity": activity,
+        "activity": normalized_activity,
         "created_at": time.time(),
     }
 
@@ -200,7 +216,7 @@ async def analyze_video(
         _run_video_job,
         job_id=job_id,
         temp_path=temp_path,
-        activity=activity,
+        activity=normalized_activity,
         user_id=user_id,
         database=database,
     )
@@ -227,6 +243,7 @@ async def get_upload_status(job_id: str) -> dict[str, Any]:
         "job_id": job_id,
         "status": job["status"],
         "progress": job["progress"],
+        "message": job["message"],
     }
 
     if job["status"] == "completed":
@@ -242,3 +259,64 @@ async def get_upload_status(job_id: str) -> dict[str, Any]:
         })
 
     return response
+
+
+async def _owned_session(request: Request, session_id: str, user: dict) -> dict:
+    database = request.app.state.database
+    session = await database.sessions.find_one({"_id": session_id})
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found.")
+    if session.get("user_id") != str(user["_id"]) and user.get("role") not in ("expert", "admin"):
+        raise HTTPException(status_code=403, detail="Access denied to this session.")
+    return session
+
+
+@router.get("/debug/{session_id}")
+async def get_upload_debug(
+    session_id: str,
+    request: Request,
+    format: str = "json",
+    user: dict = Depends(get_current_user),
+):
+    await _owned_session(request, session_id, user)
+    cursor = request.app.state.database.pose_frames.find(
+        {"session_id": session_id},
+        {"_id": 0, "timestamp": 1, "knee_angle": 1, "torso_angle": 1,
+         "view": 1, "visibility": 1, "usable": 1, "tracking_error": 1,
+         "rep_phase": 1},
+    ).sort("timestamp", 1)
+    frames = await cursor.to_list(length=None)
+    if format.lower() == "csv":
+        output = io.StringIO()
+        fields = ("timestamp", "knee_angle", "torso_angle", "view", "visibility",
+                  "usable", "tracking_error", "rep_phase")
+        writer = csv.DictWriter(output, fieldnames=fields)
+        writer.writeheader()
+        writer.writerows(frames)
+        return Response(
+            output.getvalue(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="vyronex-{session_id}-debug.csv"'},
+        )
+    if format.lower() != "json":
+        raise HTTPException(status_code=400, detail="format must be json or csv.")
+    return {"session_id": session_id, "frames": frames}
+
+
+@router.post("/recompute/{session_id}")
+async def recompute_upload_report(
+    session_id: str,
+    request: Request,
+    user: dict = Depends(get_current_user),
+) -> dict:
+    await _owned_session(request, session_id, user)
+    try:
+        return await recompute_report(
+            session_id,
+            request.app.state.database,
+            str(user["_id"]),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except VideoProcessingError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc

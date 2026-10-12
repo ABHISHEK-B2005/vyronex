@@ -70,7 +70,9 @@ export async function apiFetch(endpoint, options = {}) {
       } catch {
         // No JSON body in response
       }
-      throw new Error(errorMsg);
+      const error = new Error(errorMsg);
+      error.status = response.status;
+      throw error;
     }
 
     return response;

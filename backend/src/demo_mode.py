@@ -24,13 +24,6 @@ class DemoStep:
     landmarks: BodyLandmarks
 
 
-def _knee_and_hip_for_angle(knee_xy, angle_target_deg: float, thigh_len: float = 100.0):
-    theta = math.radians(180.0 - angle_target_deg)
-    dx = thigh_len * math.sin(theta)
-    dy = -thigh_len * math.cos(theta)
-    return (knee_xy[0] + dx, knee_xy[1] + dy)
-
-
 def _build_pose(
     knee_angle_target: float,
     torso_lean_deg: float = 5.0,
@@ -42,37 +35,34 @@ def _build_pose(
     torso_lean_deg: forward lean of the torso in degrees (0 = perfectly upright)
     knee_inward_shift: fraction of hip-width the knees shift inward (valgus proxy)
     """
-    left_knee = (290.0, 400.0)
-    right_knee = (350.0, 400.0)
-    left_ankle = (290.0, 480.0)
-    right_ankle = (350.0, 480.0)
+    hip_width = 0.34
+    shift = knee_inward_shift * hip_width
+    knee_bend = 0.45 * math.tan(math.radians((180.0 - knee_angle_target) / 2.0))
+    left_knee = (-hip_width / 2 + shift, 0.45, knee_bend)
+    right_knee = (hip_width / 2 - shift, 0.45, knee_bend)
+    left_ankle = (-hip_width / 2, 0.90, 0.0)
+    right_ankle = (hip_width / 2, 0.90, 0.0)
+    left_hip = (-hip_width / 2, 0.0, 0.0)
+    right_hip = (hip_width / 2, 0.0, 0.0)
 
-    hip_width = abs(right_knee[0] - left_knee[0])
-    shift_px = knee_inward_shift * hip_width
-    left_knee = (left_knee[0] + shift_px, left_knee[1])
-    right_knee = (right_knee[0] - shift_px, right_knee[1])
-
-    left_hip = _knee_and_hip_for_angle(left_knee, knee_angle_target)
-    right_hip = _knee_and_hip_for_angle(right_knee, knee_angle_target)
-
-    # Apply forward lean by shifting shoulders forward (x) relative to hips
-    lean_shift = math.tan(math.radians(torso_lean_deg)) * 150.0
-    shoulder_y = min(left_hip[1], right_hip[1]) - 150.0
+    shoulder_width = 0.42
+    lean_shift = math.tan(math.radians(torso_lean_deg)) * 0.5
+    shoulder_y = -0.50
 
     points = {
-        "nose": LandmarkPoint(320 + lean_shift, shoulder_y - 60, 0.98),
-        "left_shoulder": LandmarkPoint(280 + lean_shift, shoulder_y, 0.98),
-        "right_shoulder": LandmarkPoint(360 + lean_shift, shoulder_y, 0.98),
-        "left_elbow": LandmarkPoint(270 + lean_shift, shoulder_y + 60, 0.9),
-        "right_elbow": LandmarkPoint(370 + lean_shift, shoulder_y + 60, 0.9),
-        "left_wrist": LandmarkPoint(265 + lean_shift, shoulder_y + 120, 0.9),
-        "right_wrist": LandmarkPoint(375 + lean_shift, shoulder_y + 120, 0.9),
-        "left_hip": LandmarkPoint(left_hip[0], left_hip[1], 0.98),
-        "right_hip": LandmarkPoint(right_hip[0], right_hip[1], 0.98),
-        "left_knee": LandmarkPoint(left_knee[0], left_knee[1], 0.98),
-        "right_knee": LandmarkPoint(right_knee[0], right_knee[1], 0.98),
-        "left_ankle": LandmarkPoint(left_ankle[0], left_ankle[1], 0.98),
-        "right_ankle": LandmarkPoint(right_ankle[0], right_ankle[1], 0.98),
+        "nose": LandmarkPoint(0.0, -0.78, 0.98, lean_shift),
+        "left_shoulder": LandmarkPoint(-shoulder_width / 2, shoulder_y, 0.98, lean_shift),
+        "right_shoulder": LandmarkPoint(shoulder_width / 2, shoulder_y, 0.98, lean_shift),
+        "left_elbow": LandmarkPoint(-shoulder_width / 2, -0.30, 0.9, lean_shift),
+        "right_elbow": LandmarkPoint(shoulder_width / 2, -0.30, 0.9, lean_shift),
+        "left_wrist": LandmarkPoint(-shoulder_width / 2, -0.10, 0.9, lean_shift),
+        "right_wrist": LandmarkPoint(shoulder_width / 2, -0.10, 0.9, lean_shift),
+        "left_hip": LandmarkPoint(*left_hip[:2], 0.98, left_hip[2]),
+        "right_hip": LandmarkPoint(*right_hip[:2], 0.98, right_hip[2]),
+        "left_knee": LandmarkPoint(*left_knee[:2], 0.98, left_knee[2]),
+        "right_knee": LandmarkPoint(*right_knee[:2], 0.98, right_knee[2]),
+        "left_ankle": LandmarkPoint(*left_ankle[:2], 0.98, left_ankle[2]),
+        "right_ankle": LandmarkPoint(*right_ankle[:2], 0.98, right_ankle[2]),
     }
     return BodyLandmarks(points)
 

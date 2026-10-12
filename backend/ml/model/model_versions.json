@@ -137,5 +137,69 @@
     "active": false,
     "model_file": "risk_squat.joblib",
     "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.8.0",
+    "trained_at": "2026-10-06T08:19:21.862700+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.9.0",
+    "trained_at": "2026-10-06T08:22:10.275231+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.10.0",
+    "trained_at": "2026-10-06T08:29:36.977803+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
+  },
+  {
+    "version": "v1.11.0",
+    "trained_at": "2026-10-06T09:46:34.338026+00:00",
+    "exercise": "squat",
+    "algorithm": "RandomForestClassifier",
+    "sample_count": 31,
+    "unique_persons": 2,
+    "metrics": {
+      "accuracy": 0.0,
+      "macro_f1": 0.0,
+      "high_risk_recall": 1.0
+    },
+    "active": false,
+    "model_file": "risk_squat.joblib",
+    "rejection_reason": "Candidate accuracy (0.00) regressed beyond threshold compared to champion (1.00)."
   }
 ]

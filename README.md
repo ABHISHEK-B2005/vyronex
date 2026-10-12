@@ -12,7 +12,7 @@ VYRONEX is an end-to-end computer-vision and machine-learning platform for biome
                                 |       Browser / Mobile Client     |
                                 +-----------------+-----------------+
                                                   |
-                         WebSockets / REST API    |   MediaPipe Pose (2D Landmarks)
+                         WebSockets / REST API    |   MediaPipe Pose (3D World + 2D Image Landmarks)
                                                   v
 +---------------------------------------------------------------------------------------------------+
 |                                    VYRONEX BACKEND (FastAPI)                                      |
@@ -41,7 +41,11 @@ VYRONEX is an end-to-end computer-vision and machine-learning platform for biome
 
 ### 1. Multi-Modal Analysis
 - **Live Stream (`/ws/live`)**: Sub-second feedback using in-browser MediaPipe pose estimation streamed over WebSockets.
-- **Video Upload (`/api/upload/analyze`)**: Multipart video processing (`.mp4`, `.mov`, `.webm`) stepping through frames with OpenCV, extracting kinematics with exact `frame_index / fps` timestamps, and auto-deleting raw video for privacy.
+- **Video Upload (`/api/upload/analyze`)**: Processes every decoded frame with exact `frame_index / fps` timestamps, smooths MediaPipe world landmarks, detects camera view, and deletes the uploaded video after analysis. Joint coordinates and per-frame diagnostic metadata are retained for report recalculation.
+- **Upload Diagnostics**: `/api/upload/debug/{session_id}` provides per-frame JSON or `?format=csv`; `POST /api/upload/recompute/{session_id}` rebuilds reps and reports from saved pose landmarks.
+- **View-aware checks**: Front view scores knee alignment and symmetry; side view scores squat depth and torso lean; angled view scores depth only. Tune view thresholds (`0.55` front, `0.30` side), 25% maximum knee drift, and the 30% unusable-frame limit in `backend/src/config.py`.
+- **Body alignment**: Smoothed 3D pose frames produce front- or side-view alignment metrics. Unavailable metrics remain `None`/“Not assessed”; alignment scores average assessed metrics only. Tune score bands and per-metric limits in `backend/src/config.py`. Live responses include `view` and `alignment`; each stored rep and report includes its alignment summary.
+  - Tunable defaults: front/side view ratios `0.55`/`0.30`; status bands Good `>=80`, Watch `>=60`; knee drift `0.08` leg length; shoulder/hip tilt `8°`; knee-angle difference `12°`; torso lean `40°`; neck-torso deviation `20°`; knee-over-toe `0.15` leg length; ankle/hip width target `1.0` (tolerance `0.60`); bottom knee angle target `90°` (tolerance `60°`).
 
 ### 2. Biomechanical Risk & SHAP Explanations
 - **Person-Wise Trained Classifiers**: Cross-validated with `GroupKFold` on participant IDs (`person_id`) to prevent data leakage.
@@ -127,6 +131,8 @@ The FastAPI backend will be available at `http://localhost:8000` connected to Mo
 | `DELETE`| `/api/auth/data` | Authenticated | Withdraw consent and wipe stored movement features |
 | `POST` | `/api/upload/analyze` | Authenticated | Upload video for background computer vision analysis |
 | `GET`  | `/api/upload/status/{job_id}` | Authenticated | Poll video analysis job progress |
+| `GET`  | `/api/upload/debug/{session_id}` | Authenticated | Inspect per-frame pose metrics; add `?format=csv` to export |
+| `POST` | `/api/upload/recompute/{session_id}` | Authenticated | Rebuild rep results and report from saved pose landmarks |
 | `POST` | `/api/feedback/rep/{rep_id}` | Authenticated | Submit rep rating validation ("Was this rating correct?") |
 | `GET`  | `/api/expert/queue` | `expert` | Fetch review queue of disputed and low-confidence reps |
 | `POST` | `/api/expert/label/{rep_id}`| `expert` | Coach/physio sets true ground-truth label |
@@ -136,6 +142,7 @@ The FastAPI backend will be available at `http://localhost:8000` connected to Mo
 | `GET`  | `/api/coach/recommendations/{session_id}` | Authenticated | Post-workout corrective drills |
 | `GET`  | `/api/reports/{session_id}` | Authenticated | Fetch full session report & analytics |
 | `GET`  | `/api/reports/{session_id}/pdf` | Authenticated | Download clinical PDF report |
+| `GET`  | `/api/alignment/summary?activity=&days=30` | Authenticated | Alignment score trend and recurring body-area issues |
 | `GET`  | `/api/history` | Authenticated | Filterable session history, trends, and risk forecast |
 
 ---
@@ -148,6 +155,19 @@ Run the comprehensive test suite with Python unittest:
 cd backend
 python -m unittest discover tests
 ```
+
+For targeted alignment regressions, run `python -m pytest tests/test_video_processor.py tests/test_coach_and_reports.py`.
+
+### Real-clip alignment check
+
+Use four squat clips with a fixed camera, good light, and the whole body visible:
+
+1. **Front, good form:** face the camera and keep knees and shoulders balanced; expect front metrics assessed and mostly Good.
+2. **Front, knees-in:** perform controlled reps with a visible inward knee drift; expect knee alignment to change to Watch/Fix, not a tracking error.
+3. **Side, good form:** turn 90 degrees to the camera and squat with a comfortable upright torso; expect side metrics assessed and front-only metrics shown as not assessed.
+4. **Side, leaning:** repeat from the side with an obvious forward torso lean; expect torso alignment to be flagged.
+
+Compare the live panel and saved report. Repeat clips with feet/knees/hips occluded only as a tracking test; those metrics should be not assessed rather than shown as zero.
 
 ---
 

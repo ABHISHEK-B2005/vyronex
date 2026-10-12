@@ -4,7 +4,7 @@
 
 import { apiFetch, API_BASE_URL, getToken } from "./auth.js";
 
-const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024; // 100 MB
+const MAX_FILE_SIZE_BYTES = 100 * 1024 * 1024;
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm"];
 
 export async function uploadAndAnalyzeVideo(file, activityId, onProgress) {
@@ -28,11 +28,16 @@ export async function uploadAndAnalyzeVideo(file, activityId, onProgress) {
   const headers = {};
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const response = await fetch(`${API_BASE_URL}/api/upload/analyze`, {
-    method: "POST",
-    headers,
-    body: formData,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/api/upload/analyze`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+  } catch {
+    throw new Error("Unable to connect to Vyronex backend server (http://localhost:8000). Please ensure the backend is running.");
+  }
 
   if (response.status === 415) {
     throw new Error("Unsupported media format. Please upload a standard MP4, MOV, or WebM video.");
@@ -45,6 +50,7 @@ export async function uploadAndAnalyzeVideo(file, activityId, onProgress) {
 
   const result = await response.json();
   const jobId = result.job_id;
+  if (!jobId) throw new Error("The backend accepted the upload but did not return an analysis job ID.");
 
   if (result.session_id && result.status === "completed") {
     onProgress({ percent: 100, message: "Analysis complete! Loading report..." });
@@ -56,8 +62,9 @@ export async function uploadAndAnalyzeVideo(file, activityId, onProgress) {
 }
 
 async function pollJobStatus(jobId, onProgress) {
-  const maxAttempts = 120; // 2 minutes max
+  const maxAttempts = 600;
   let attempts = 0;
+  let consecutiveErrors = 0;
 
   while (attempts < maxAttempts) {
     attempts++;
@@ -66,11 +73,12 @@ async function pollJobStatus(jobId, onProgress) {
     try {
       const res = await apiFetch(`/api/upload/status/${jobId}`);
       const data = await res.json();
+      consecutiveErrors = 0;
 
-      const progress = Math.max(10, Math.min(98, data.progress || (attempts * 4)));
+      const progress = Math.max(5, Math.min(99, Number(data.progress ?? 0)));
       onProgress({
         percent: progress,
-        message: data.message || `Processing kinematic frames (${progress}%)...`,
+        message: data.message || `Analyzing video frames (${Math.round(progress)}%)...`,
       });
 
       if (data.status === "completed" && data.session_id) {
@@ -81,12 +89,17 @@ async function pollJobStatus(jobId, onProgress) {
       if (data.status === "failed") {
         throw new Error(data.error || "Video analysis encountered an error.");
       }
+      if (data.status === "completed" && !data.session_id) {
+        throw new Error("Analysis completed, but the backend did not return a report session.");
+      }
     } catch (err) {
-      if (err.message.includes("Analysis encountered an error") || err.message.includes("404")) {
-        throw err;
+      if (err.status || !err.message.includes("Unable to connect")) throw err;
+      consecutiveErrors += 1;
+      if (consecutiveErrors >= 3) {
+        throw new Error("The connection to the backend was lost. Please check that it is running and retry.");
       }
     }
   }
 
-  throw new Error("Analysis timed out. Please try again with a shorter clip.");
+  throw new Error("Video analysis is taking longer than expected. Check the backend and try a shorter clip.");
 }

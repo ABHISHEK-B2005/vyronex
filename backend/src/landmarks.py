@@ -46,6 +46,8 @@ MEDIAPIPE_INDEX_MAP = {
     "right_knee": 26,
     "left_ankle": 27,
     "right_ankle": 28,
+    "left_foot_index": 31,
+    "right_foot_index": 32,
 }
 
 
@@ -54,6 +56,9 @@ class LandmarkPoint:
     x: float
     y: float
     visibility: float
+    z: float = 0.0
+    image_x: float | None = None
+    image_y: float | None = None
 
     @property
     def as_tuple(self) -> Point:
@@ -67,28 +72,39 @@ class LandmarkPoint:
 class BodyLandmarks:
     """Safe container for a single frame's detected body landmarks."""
 
-    def __init__(self, points: Dict[str, LandmarkPoint]):
+    def __init__(self, points: Dict[str, LandmarkPoint], low_confidence: bool = False):
         self._points = points
+        self.low_confidence = low_confidence
 
     @classmethod
-    def from_mediapipe(cls, pose_landmarks, frame_width: int, frame_height: int) -> "BodyLandmarks":
-        """Build a BodyLandmarks instance from a MediaPipe
-        ``pose_landmarks.landmark`` list, converting normalized MediaPipe
-        coordinates into pixel coordinates.
-        """
+    def from_mediapipe(
+        cls,
+        pose_landmarks,
+        frame_width: int,
+        frame_height: int,
+        world_landmarks=None,
+    ) -> "BodyLandmarks":
+        """Prefer hip-centered world coordinates; use image coordinates as fallback."""
         points: Dict[str, LandmarkPoint] = {}
+        image_points = getattr(pose_landmarks, "landmark", pose_landmarks)
+        world_points = getattr(world_landmarks, "landmark", world_landmarks)
+        low_confidence = world_points is None
         for name, idx in MEDIAPIPE_INDEX_MAP.items():
             try:
-                lm = pose_landmarks.landmark[idx]
+                image_lm = image_points[idx]
+                lm = world_points[idx] if world_points is not None else image_lm
                 points[name] = LandmarkPoint(
-                    x=lm.x * frame_width,
-                    y=lm.y * frame_height,
-                    visibility=float(getattr(lm, "visibility", 1.0)),
+                    x=float(lm.x) if world_points is not None else float(lm.x) * frame_width,
+                    y=float(lm.y) if world_points is not None else float(lm.y) * frame_height,
+                    visibility=float(getattr(image_lm, "visibility", getattr(lm, "visibility", 1.0))),
+                    z=float(getattr(lm, "z", 0.0)) if world_points is not None else 0.0,
+                    image_x=float(image_lm.x) * frame_width,
+                    image_y=float(image_lm.y) * frame_height,
                 )
             except (IndexError, AttributeError):
                 # Missing landmark -> mark as invisible instead of crashing
                 points[name] = LandmarkPoint(x=0.0, y=0.0, visibility=0.0)
-        return cls(points)
+        return cls(points, low_confidence=low_confidence)
 
     def get(self, name: str) -> Optional[LandmarkPoint]:
         return self._points.get(name)
@@ -99,6 +115,23 @@ class BodyLandmarks:
         if lm is None or not lm.is_visible:
             return None
         return lm.as_tuple
+
+    def point3d(self, name: str) -> Optional[Tuple[float, float, float]]:
+        lm = self._points.get(name)
+        if lm is None or not lm.is_visible:
+            return None
+        return (lm.x, lm.y, lm.z)
+
+    def numeric_dict(self) -> Dict[str, Dict[str, float]]:
+        return {
+            name: {
+                "x": float(point.x),
+                "y": float(point.y),
+                "z": float(point.z),
+                "visibility": float(point.visibility),
+            }
+            for name, point in self._points.items()
+        }
 
     def has_all(self, names) -> bool:
         """True only if every requested landmark is present & confident."""

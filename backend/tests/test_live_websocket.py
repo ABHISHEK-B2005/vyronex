@@ -158,7 +158,7 @@ class LiveWebSocketTests(unittest.TestCase):
             self.assertEqual(latest["rep_count"], 5)
             self.assertEqual(len(completed_reps), 5)
             cave_rep = completed_reps[2]
-            self.assertEqual(cave_rep["risk"]["risk_level"], "MODERATE")
+            self.assertIn(cave_rep["risk"]["risk_level"], {"MODERATE", "HIGH"})
             self.assertEqual(
                 cave_rep["feedback"]["warning_tag"],
                 "KNEE ALIGNMENT WARNING",

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
 
 
 class ReportRecord(BaseModel):
@@ -17,3 +18,4 @@ class ReportRecord(BaseModel):
     worst_rep: dict[str, int | float | str | None] | None = None
     recommendations: list[str] = Field(default_factory=list)
     compared_to_last: dict[str, int | float | str | None] = Field(default_factory=dict)
+    alignment: dict[str, Any] = Field(default_factory=dict)

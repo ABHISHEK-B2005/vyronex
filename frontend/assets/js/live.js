@@ -1,218 +1,298 @@
 /**
- * Vyronex Live Camera & MediaPipe Pose WebSocket Client
+ * Browser camera and MediaPipe pose client.
  */
 
-import { getToken, API_BASE_URL } from "./auth.js";
+import { apiFetch } from "./auth.js";
 import { speakCue, cancelVoice } from "./voice.js";
+import { updateDebugStatus } from "./debug.js";
+import { POSE_VERSION, loadPoseScript } from "./pose-loader.js";
+import {
+  cameraError,
+  drawAlignmentGuides,
+  drawSkeleton,
+  getAlignmentCue,
+  renderLiveAlignment,
+} from "./live-ui.js";
 
-let videoEl = null;
-let canvasEl = null;
-let ctx = null;
-let stream = null;
-let ws = null;
-let isRunning = false;
-let currentSessionId = null;
-let lastFrameSent = 0;
-const TARGET_FPS = 15;
-const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
-
-const POSE_CONNECTIONS = [
-  ["left_shoulder", "right_shoulder"],
-  ["left_shoulder", "left_elbow"],
-  ["left_elbow", "left_wrist"],
-  ["right_shoulder", "right_elbow"],
-  ["right_elbow", "right_wrist"],
-  ["left_shoulder", "left_hip"],
-  ["right_shoulder", "right_hip"],
-  ["left_hip", "right_hip"],
-  ["left_hip", "left_knee"],
-  ["left_knee", "left_ankle"],
-  ["right_hip", "right_knee"],
-  ["right_knee", "right_ankle"],
-];
-
-const MEDIAPIPE_INDEX_MAP = {
-  11: "left_shoulder",
-  12: "right_shoulder",
-  13: "left_elbow",
-  14: "right_elbow",
-  15: "left_wrist",
-  16: "right_wrist",
-  23: "left_hip",
-  24: "right_hip",
-  25: "left_knee",
-  26: "right_knee",
-  27: "left_ankle",
-  28: "right_ankle",
-};
+const FRAME_INTERVAL_MS = 75;
+const LANDMARK_INDEX = { nose: 0, left_shoulder: 11, right_shoulder: 12, left_elbow: 13, right_elbow: 14, left_wrist: 15, right_wrist: 16, left_hip: 23, right_hip: 24, left_knee: 25, right_knee: 26, left_ankle: 27, right_ankle: 28, left_foot_index: 31, right_foot_index: 32 };
+const LOWER_BODY = ["left_hip", "right_hip", "left_knee", "right_knee", "left_ankle", "right_ankle"];
+let videoEl, canvasEl, ctx, stream, poseInstance;
+let isRunning = false, isStarting = false, isProcessingPose = false, isSendingFrame = false;
+let currentSessionId = null, currentActivity = "squat";
+let lastPoseTime = 0, nextFrameAt = 0, framesSentCount = 0;
+let lastSpokenCue = "", hasRestartedSession = false;
+let pendingPose = null, pendingFrame = null;
+let currentAlignment = null, currentView = "unknown", sessionStartedAt = 0;
 
 export async function startLiveSession(activityId, onUpdate) {
+  if (isRunning || isStarting) return;
+  isStarting = true;
+  currentActivity = activityId || "squat";
   videoEl = document.getElementById("live-video");
   canvasEl = document.getElementById("live-canvas");
-  if (!videoEl || !canvasEl) return;
-  ctx = canvasEl.getContext("2d");
 
-  const token = getToken();
-  if (!token) {
-    window.location.assign("login.html");
-    return;
-  }
-
-  // 1. Request Camera
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-      audio: false,
+    if (!videoEl || !canvasEl) throw new Error("Camera view is unavailable.");
+    if (currentActivity !== "squat") {
+      throw new Error("Live camera rep analysis currently supports squats. You can upload a video for other activities.");
+    }
+    const { hostname, protocol } = window.location;
+    if (protocol !== "https:" && hostname !== "localhost" && hostname !== "127.0.0.1") {
+      throw new Error("Open this page through a local server (http://localhost) so the camera is allowed.");
+    }
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error("This browser cannot access a camera. Open the page through localhost or HTTPS.");
+    }
+    if (currentSessionId) await endSession();
+
+    const startRes = await apiFetch("/api/session/start", {
+      method: "POST",
+      body: JSON.stringify({ exercise: currentActivity.toUpperCase(), risk_mode: "rule_based" }),
     });
-    videoEl.srcObject = stream;
-    await videoEl.play();
-  } catch (err) {
-    onUpdate({ error: "Camera access was denied. Please allow camera permissions to start movement screening." });
+    const sessionData = await startRes.json();
+    if (!sessionData.session_id) throw new Error("The backend did not return a session ID.");
+    currentSessionId = sessionData.session_id;
+    sessionStartedAt = performance.now();
+    currentAlignment = null;
+    currentView = "unknown";
+    updateDebugStatus({
+      lastHttpStatus: startRes.status,
+      lastResponseMsg: "Session started",
+      framesSent: 0,
+      poseDetected: "No",
+    });
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user", width: 640, height: 480 },
+        audio: false,
+      });
+      videoEl.srcObject = stream;
+      await videoEl.play();
+      updateDebugStatus({ camera: "On" });
+    } catch (error) {
+      throw cameraError(error);
+    }
+
+    ctx = canvasEl.getContext("2d");
+    if (!ctx) throw new Error("This browser cannot draw the camera preview.");
+    framesSentCount = 0;
+    hasRestartedSession = false;
+    lastSpokenCue = "";
+    lastPoseTime = 0;
+    nextFrameAt = 0;
+    isRunning = true;
+    await initMediaPipe(onUpdate);
+    onUpdate({ started: true });
+  } catch (error) {
+    let message = error.message;
+    await releaseCamera();
+    try {
+      await closePose();
+      await endSession();
+    } catch (endError) {
+      message = `${message} The session could not be finalized: ${endError.message}`;
+    }
+    isRunning = false;
+    onUpdate({ error: message });
+    updateDebugStatus({ camera: "Off", lastResponseMsg: message });
+  } finally {
+    isStarting = false;
+  }
+}
+
+async function initMediaPipe(onUpdate) {
+  try {
+    await loadPoseScript();
+    if (typeof window.Pose !== "function") throw new Error("MediaPipe Pose did not initialize.");
+    poseInstance = new window.Pose({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose@${POSE_VERSION}/${file}`,
+    });
+    poseInstance.setOptions({ modelComplexity: 1, smoothLandmarks: true, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+    poseInstance.onResults((results) => handlePoseResults(results, onUpdate));
+    startCameraProcessingLoop(onUpdate);
+  } catch (error) {
+    throw new Error(`Could not load MediaPipe Pose. Check your internet connection and retry. (${error.message})`);
+  }
+}
+
+function startCameraProcessingLoop(onUpdate) {
+  const step = async (now) => {
+    if (!isRunning || !videoEl || !poseInstance) return;
+    if (videoEl.readyState >= 2 && !isProcessingPose && now - lastPoseTime >= FRAME_INTERVAL_MS) {
+      isProcessingPose = true;
+      lastPoseTime = now;
+      pendingPose = (async () => {
+        try { await poseInstance.send({ image: videoEl }); }
+        catch (error) {
+          onUpdate({ error: `Pose analysis stopped: ${error.message}` });
+          updateDebugStatus({ lastResponseMsg: "Pose inference failed" });
+          isRunning = false;
+          await releaseCamera();
+          try { await endSession(); } catch (endError) {
+            onUpdate({ error: `Pose analysis stopped and the session could not be finalized: ${endError.message}` });
+          }
+        }
+      })();
+      try { await pendingPose; }
+      finally {
+        pendingPose = null;
+        isProcessingPose = false;
+      }
+    }
+    if (isRunning) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function handlePoseResults(results, onUpdate) {
+  if (!isRunning || !canvasEl || !videoEl) return;
+  if (videoEl.videoWidth > 0 && canvasEl.width !== videoEl.videoWidth) [canvasEl.width, canvasEl.height] = [videoEl.videoWidth, videoEl.videoHeight];
+  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  if (videoEl.readyState >= 2) ctx.drawImage(videoEl, 0, 0, canvasEl.width, canvasEl.height);
+
+  const landmarks = results.poseLandmarks;
+  if (!landmarks?.length) {
+    updateDebugStatus({ poseDetected: "No", visibleLandmarks: 0 });
+    onUpdate({ landmarks_ok: false, cue: "Step back so your whole body is visible" });
     return;
   }
 
-  isRunning = true;
+  drawSkeleton(ctx, canvasEl, landmarks);
+  drawAlignmentGuides(ctx, canvasEl, landmarks, currentAlignment, currentView);
+  const visibleCount = landmarks.filter((point) => (point.visibility ?? 0) >= 0.5).length;
+  updateDebugStatus({ poseDetected: "Yes", visibleLandmarks: visibleCount });
 
-  // 2. Connect WebSocket
-  const wsProto = window.location.protocol === "https:" ? "wss:" : "ws:";
-  const wsHost = API_BASE_URL.replace(/^https?:\/\//, "");
-  const wsUrl = `${wsProto}//${wsHost}/ws/live?token=${encodeURIComponent(token)}&activity=${encodeURIComponent(activityId)}`;
-
-  connectWebSocket(wsUrl, onUpdate);
-
-  // 3. Start Camera Frame & MediaPipe Loop
-  requestAnimationFrame(processVideoFrame);
+  const payload = {};
+  const worldLandmarks = results.poseWorldLandmarks;
+  for (const [name, index] of Object.entries(LANDMARK_INDEX)) {
+    const point = landmarks[index];
+    if (!point) continue;
+    const world = worldLandmarks?.[index];
+    payload[name] = world ? {
+      x: world.x, y: world.y, z: world.z ?? 0,
+      image_x: point.x, image_y: point.y,
+      visibility: point.visibility ?? 1,
+    } : {
+      x: Math.min(1, Math.max(0, point.x ?? 0)),
+      y: Math.min(1, Math.max(0, point.y ?? 0)),
+      image_x: point.x, image_y: point.y,
+      visibility: point.visibility ?? 1,
+    };
+  }
+  if (LOWER_BODY.some((name) => payload[name].visibility < 0.5)) {
+    const cue = "Move back so your hips, knees and ankles are visible";
+    onUpdate({ landmarks_ok: false, cue, guidance: cue });
+    return;
+  }
+  if (!isSendingFrame && Date.now() >= nextFrameAt) {
+    pendingFrame = sendFrame(payload, onUpdate).finally(() => { pendingFrame = null; });
+  }
 }
 
-function connectWebSocket(wsUrl, onUpdate) {
+async function sendFrame(landmarks, onUpdate) {
+  if (!currentSessionId || isSendingFrame) return;
+  isSendingFrame = true;
+  framesSentCount += 1;
+  updateDebugStatus({ framesSent: framesSentCount });
   try {
-    ws = new WebSocket(wsUrl);
+    const response = await apiFetch("/api/frame", {
+      method: "POST",
+      body: JSON.stringify({
+        session_id: currentSessionId,
+        landmarks,
+        t: (performance.now() - sessionStartedAt) / 1000,
+      }),
+    });
+    const data = await response.json();
+    nextFrameAt = 0;
+    updateDebugStatus({ framesSent: framesSentCount, lastHttpStatus: response.status, lastResponseMsg: data.message || "Frame analyzed" });
+    if (data.landmarks_ok === false) {
+      onUpdate({ landmarks_ok: false, cue: data.message || "Adjust your position" });
+      return;
+    }
 
-    ws.onopen = () => {
-      onUpdate({ status: "connected", message: "Connected. Position yourself in camera frame." });
-    };
-
-    ws.onmessage = (event) => {
+    currentAlignment = data.alignment || null;
+    currentView = data.view || "unknown";
+    renderLiveAlignment(currentAlignment, currentView);
+    const completedRep = data.completed_rep;
+    const alignmentCue = getAlignmentCue(currentAlignment);
+    const cue = alignmentCue || completedRep?.feedback?.recommendation || data.message || "";
+    if (completedRep) {
+      const riskLevel = (completedRep.risk?.risk_level || "LOW").toUpperCase();
+      onUpdate({ risk_level: riskLevel });
+      if (cue && cue !== lastSpokenCue) {
+        lastSpokenCue = cue;
+        speakCue(cue);
+      }
+    }
+    if (cue && cue !== lastSpokenCue) {
+      lastSpokenCue = cue;
+      speakCue(cue);
+    }
+    onUpdate({ landmarks_ok: true, rep_count: data.rep_count ?? 0, phase: data.phase || "ready", cue: cue || undefined, completed_rep: completedRep, avg_knee_angle: data.avg_knee_angle, alignment: currentAlignment, view: currentView });
+  } catch (error) {
+    updateDebugStatus({ lastHttpStatus: error.status || "Error", lastResponseMsg: error.message });
+    if (error.status === 404 && !hasRestartedSession) {
+      hasRestartedSession = true;
+      nextFrameAt = Date.now() + 250;
       try {
-        const data = JSON.parse(event.data);
-        if (data.session_id) currentSessionId = data.session_id;
-
-        if (data.type === "rep_completed" || data.completed_rep) {
-          const rep = data.completed_rep || data;
-          const cue = rep.feedback?.recommendation || rep.feedback || "Good rep!";
-          speakCue(cue);
-        } else if (data.message && data.message !== "Keep moving") {
-          speakCue(data.message);
+        const staleSessionId = currentSessionId;
+        if (staleSessionId) {
+          try {
+            await apiFetch(`/api/session/${staleSessionId}/end`, { method: "POST" });
+          } catch (endError) {
+            if (endError.status !== 404) throw endError;
+          }
         }
-
-        onUpdate({
-          rep_count: data.rep_count || 0,
-          phase: data.phase || "ready",
-          risk_level: data.risk_level || "LOW",
-          cue: data.message || "Ready. Begin movement.",
-          landmarks_ok: data.landmarks_ok !== false,
-          session_id: currentSessionId,
-        });
-      } catch (e) {
-        console.error("WS Parse error:", e);
+        const response = await apiFetch("/api/session/start", { method: "POST", body: JSON.stringify({ exercise: currentActivity.toUpperCase(), risk_mode: "rule_based" }) });
+        const data = await response.json();
+        if (!data.session_id) throw new Error("The backend did not return a session ID.");
+        currentSessionId = data.session_id;
+        updateDebugStatus({ lastHttpStatus: response.status, lastResponseMsg: "Session restarted" });
+      } catch (restartError) {
+        onUpdate({ error: `Could not restart the session: ${restartError.message}` });
       }
-    };
-
-    ws.onerror = () => {
-      onUpdate({ error: "Live connection interrupted. Reconnecting..." });
-    };
-
-    ws.onclose = () => {
-      if (isRunning) {
-        setTimeout(() => {
-          if (isRunning) connectWebSocket(wsUrl, onUpdate);
-        }, 2000);
-      }
-    };
-  } catch (err) {
-    onUpdate({ error: "Failed to establish WebSocket connection." });
-  }
-}
-
-function processVideoFrame(timestamp) {
-  if (!isRunning || !videoEl || !canvasEl) return;
-
-  if (canvasEl.width !== videoEl.videoWidth && videoEl.videoWidth > 0) {
-    canvasEl.width = videoEl.videoWidth;
-    canvasEl.height = videoEl.videoHeight;
-  }
-
-  ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
-
-  // Throttle frame transmission
-  if (timestamp - lastFrameSent >= FRAME_INTERVAL_MS && ws && ws.readyState === WebSocket.OPEN) {
-    lastFrameSent = timestamp;
-    extractAndSendLandmarks();
-  }
-
-  requestAnimationFrame(processVideoFrame);
-}
-
-function extractAndSendLandmarks() {
-  // Use client-side MediaPipe if loaded or send video timestamp signal
-  if (window.currentMediaPipeLandmarks) {
-    const rawLandmarks = window.currentMediaPipeLandmarks;
-    const bodyLandmarks = {};
-    for (const [idxStr, name] of Object.entries(MEDIAPIPE_INDEX_MAP)) {
-      const lm = rawLandmarks[parseInt(idxStr, 10)];
-      if (lm) {
-        bodyLandmarks[name] = {
-          x: lm.x * canvasEl.width,
-          y: lm.y * canvasEl.height,
-          visibility: lm.visibility || 0.9,
-        };
-      }
+    } else {
+      nextFrameAt = Date.now() + 1000;
+      onUpdate({ reconnecting: true, cue: "Connection lost, reconnecting" });
     }
-
-    drawSkeleton(bodyLandmarks);
-
-    if (Object.keys(bodyLandmarks).length >= 6) {
-      ws.send(JSON.stringify({
-        landmarks: bodyLandmarks,
-        timestamp_sec: videoEl.currentTime,
-      }));
-    }
+  } finally {
+    isSendingFrame = false;
   }
 }
 
-function drawSkeleton(landmarks) {
-  ctx.strokeStyle = "#2B8BE0";
-  ctx.lineWidth = 3;
-  ctx.fillStyle = "#FFC20E";
-
-  // Draw Lines
-  for (const [p1, p2] of POSE_CONNECTIONS) {
-    if (landmarks[p1] && landmarks[p2]) {
-      ctx.beginPath();
-      ctx.moveTo(landmarks[p1].x, landmarks[p1].y);
-      ctx.lineTo(landmarks[p2].x, landmarks[p2].y);
-      ctx.stroke();
-    }
-  }
-
-  // Draw Joint Dots
-  for (const pt of Object.values(landmarks)) {
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, 5, 0, 2 * Math.PI);
-    ctx.fill();
-  }
+async function releaseCamera() {
+  if (stream) stream.getTracks().forEach((track) => track.stop());
+  stream = null;
+  if (videoEl) videoEl.srcObject = null;
+  if (canvasEl && ctx) ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+  updateDebugStatus({ camera: "Off", poseDetected: "No" });
 }
 
-export function stopLiveSession() {
+async function closePose() {
+  if (poseInstance) await poseInstance.close();
+  poseInstance = null;
+}
+
+async function endSession() {
+  const sessionId = currentSessionId;
+  if (sessionId) await apiFetch(`/api/session/${sessionId}/end`, { method: "POST" });
+  currentSessionId = null;
+  return sessionId;
+}
+
+export async function stopLiveSession() {
   isRunning = false;
   cancelVoice();
-  if (ws) {
-    ws.close();
-    ws = null;
+  if (pendingPose) await pendingPose;
+  await releaseCamera();
+  if (pendingFrame) await pendingFrame;
+  try {
+    await closePose();
+  } finally {
+    isProcessingPose = false;
   }
-  if (stream) {
-    stream.getTracks().forEach(t => t.stop());
-    stream = null;
-  }
-  return currentSessionId;
+  return endSession();
 }

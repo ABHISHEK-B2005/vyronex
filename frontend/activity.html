@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Movement Analysis | VYRONEX</title>
+  <title>Movement Screening | VYRONEX</title>
   <link rel="stylesheet" href="assets/css/style.css">
   <script type="module" src="assets/js/guard.js"></script>
 </head>
@@ -12,26 +12,26 @@
     <div class="header-inner">
       <div style="display: flex; align-items: center; gap: 14px;">
         <a class="brand" href="index.html">VYRONEX</a>
-        <span id="header-activity-tag" class="badge badge-info">ANALYSIS</span>
+        <span id="header-activity-tag" class="brand-badge">SCREENING</span>
       </div>
       <nav>
         <ul class="nav-links">
           <li><a href="javascript:history.back()">Back to Dashboard</a></li>
           <li><a href="history.html">History</a></li>
           <li><a href="coach.html">Coach</a></li>
-          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm">Log Out</button></li>
         </ul>
       </nav>
     </div>
   </header>
 
-  <main class="main-content" style="max-width: 960px;">
+  <main class="main-content" style="max-width: 920px;">
     <!-- Invalid Activity Fallback -->
     <div id="invalid-activity-card" class="card" style="text-align: center; padding: 48px 24px;" hidden>
       <div style="font-size: 3rem; margin-bottom: 12px;">⚠️</div>
       <h2 style="margin-bottom: 8px;">Select an Activity First</h2>
-      <p style="color: var(--muted); max-width: 480px; margin: 0 auto 24px;">
-        Please choose an exercise or athletic event from your dashboard to begin computer vision screening.
+      <p style="color: var(--text); max-width: 480px; margin: 0 auto 24px;">
+        Please choose an exercise or event from your dashboard to begin a movement review.
       </p>
       <div style="display: flex; justify-content: center; gap: 14px; flex-wrap: wrap;">
         <a href="gym.html" class="btn btn-primary">Gym Dashboard</a>
@@ -43,15 +43,17 @@
     <div id="screening-view">
       <!-- Title & Instructions -->
       <div style="margin-bottom: 20px;">
-        <h1 id="activity-title" class="title-accent" style="margin-bottom: 8px;">Bodyweight Squat</h1>
-        <p id="activity-desc" style="color: var(--muted); font-size: 1.05rem;">Screen knee valgus (cave-in), lumbar flexion, and depth symmetry.</p>
+        <h1 id="activity-title" style="margin-bottom: 6px;">Bodyweight Squat</h1>
+        <p id="activity-desc" style="color: var(--text); font-size: 1.05rem;">
+          Screen knee valgus (cave-in), lumbar flexion, and depth symmetry.
+        </p>
       </div>
 
       <!-- Activity Instructions Card -->
-      <div class="card" style="margin-bottom: 24px; padding: 18px 22px; border-left: 4px solid var(--blue); background: #f0f7ff;">
-        <h3 style="margin-top: 0; color: var(--blue-deep); font-size: 1.05rem; margin-bottom: 6px;">📋 Instructions Before Starting</h3>
-        <ul id="instructions-list" style="margin: 0; padding-left: 20px; font-size: 0.92rem; color: #1e3a5f;">
-          <!-- Loaded dynamically -->
+      <div class="info-banner" style="margin-bottom: 24px;">
+        <strong style="color: var(--primary);">📋 Form Instructions & Camera Positioning:</strong>
+        <ul id="instructions-list" style="margin: 6px 0 0 20px; font-size: 0.95rem; line-height: 1.6;">
+          <!-- Loaded dynamically from activities.js -->
         </ul>
       </div>
 
@@ -63,41 +65,61 @@
 
       <!-- Tab 1: Live Camera Screening -->
       <div id="tab-camera-panel" class="camera-panel">
-        <div class="camera-wrapper">
-          <video id="live-video" playsinline muted autoplay></video>
-          <canvas id="live-canvas"></canvas>
+        <div class="live-analysis-layout">
+          <div class="camera-wrapper">
+            <video id="live-video" playsinline muted autoplay></video>
+            <canvas id="live-canvas"></canvas>
+            <div id="framing-guide-overlay" class="camera-guide-overlay" style="display: none;"></div>
+          </div>
+          <aside class="card live-alignment-panel" aria-live="polite">
+            <h3>Body alignment</h3>
+            <div class="alignment-gauge" id="live-alignment-gauge" data-status="Not assessed">
+              <span id="live-alignment-score">—</span>
+            </div>
+            <span id="live-alignment-status" class="alignment-status">Waiting for pose</span>
+            <p id="live-view-guide">Camera view will appear when a pose is detected.</p>
+            <div id="live-alignment-metrics" class="alignment-metrics-list">
+              <p class="alignment-unassessed">Alignment metrics will appear here.</p>
+            </div>
+          </aside>
         </div>
 
         <div id="camera-error" class="alert-error" style="margin-top: 16px;" role="alert" hidden></div>
+        <div style="display: flex; justify-content: center; margin-top: 16px;">
+          <button id="start-live-btn" class="btn btn-primary">Start camera check</button>
+        </div>
 
         <!-- Live HUD Feedback -->
         <div class="coach-hud">
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--line); padding-bottom: 10px;">
+          <div class="hud-metrics">
             <div>
-              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Completed Reps</span>
-              <div id="hud-reps" style="font-size: 1.8rem; font-weight: 800; color: var(--ink);">0</div>
+              <span style="font-size: 0.8rem; color: var(--text); text-transform: uppercase; font-weight: 600;">Completed Reps</span>
+              <div id="hud-reps" style="font-size: 2rem; font-weight: 800; color: var(--heading);">0</div>
             </div>
             <div>
-              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Phase</span>
-              <div id="hud-phase" style="font-size: 1.2rem; font-weight: 700; color: var(--blue-deep); margin-top: 4px;">READY</div>
+              <span style="font-size: 0.8rem; color: var(--text); text-transform: uppercase; font-weight: 600;">Phase</span>
+              <div id="hud-phase" style="font-size: 1.25rem; font-weight: 700; color: var(--primary); margin-top: 4px;">READY</div>
             </div>
             <div>
-              <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Live Risk</span>
-              <div style="margin-top: 4px;"><span id="hud-risk-badge" class="badge badge-good">Good Form</span></div>
+              <span style="font-size: 0.8rem; color: var(--text); text-transform: uppercase; font-weight: 600;">Risk Status</span>
+              <div style="margin-top: 4px;"><span id="hud-risk-badge" class="badge badge-info">Waiting for first rep</span></div>
             </div>
           </div>
 
           <div>
-            <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Live Coaching Cue</span>
-            <div id="hud-cue" class="coach-hud-cue" aria-live="polite">Ready. Begin movement.</div>
+            <span style="font-size: 0.8rem; color: var(--text); text-transform: uppercase; font-weight: 600;">Real-Time Coaching Cue</span>
+            <div id="hud-cue" class="coach-hud-cue" aria-live="polite">Start the camera check when you are ready.</div>
           </div>
         </div>
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 12px;">
-          <div style="font-size: 0.85rem; color: var(--muted);">
+        <!-- Collapsible Diagnostic Check Panel -->
+        <div id="debug-panel-container"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 18px; flex-wrap: wrap; gap: 14px;">
+          <div style="font-size: 0.88rem; color: var(--text);">
             🔊 Voice coaching cues are active.
           </div>
-          <button id="finish-workout-btn" class="btn btn-primary">
+          <button id="finish-workout-btn" class="btn btn-primary" disabled>
             🏁 Finish Workout & View Report
           </button>
         </div>
@@ -105,9 +127,9 @@
 
       <!-- Tab 2: Upload Video File -->
       <div id="tab-upload-panel" class="card" hidden>
-        <h3 style="margin-top: 0; margin-bottom: 8px;">Upload a Pre-Recorded Video</h3>
-        <p style="color: var(--muted); font-size: 0.92rem; margin-bottom: 20px;">
-          Supported formats: MP4, MOV, WebM. Max size: 100 MB. We process every frame to analyze full rep duration and kinematics.
+        <h3 style="margin-top: 0; margin-bottom: 8px;">Upload a Pre-Recorded Video Clip</h3>
+        <p id="upload-help" style="color: var(--text); font-size: 0.95rem; margin-bottom: 20px;">
+          Squat analysis works best from a front-facing view with your whole body visible. Supported formats: MP4, MOV, WebM; maximum size: 100 MB. Other activity analyzers are not available yet.
         </p>
 
         <div id="upload-error" class="alert-error" role="alert" hidden></div>
@@ -118,17 +140,17 @@
           </div>
 
           <!-- Progress Bar -->
-          <div id="upload-progress-container" style="margin: 16px 0;" hidden>
-            <div style="display: flex; justify-content: space-between; font-size: 0.88rem; margin-bottom: 6px;">
-              <span id="progress-message" style="color: var(--ink); font-weight: 600;">Processing video...</span>
-              <span id="progress-percent" style="font-weight: 700; color: var(--blue);">0%</span>
+          <div id="upload-progress-container" style="margin: 18px 0;" hidden>
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+              <span id="progress-message" style="color: var(--heading); font-weight: 600;">Processing video frames...</span>
+              <span id="progress-percent" style="font-weight: 700; color: var(--secondary);">0%</span>
             </div>
-            <div style="background: var(--line); height: 10px; border-radius: 5px; overflow: hidden;">
-              <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--blue); transition: width 0.3s ease;"></div>
+            <div style="background: var(--border); height: 10px; border-radius: 5px; overflow: hidden;">
+              <div id="progress-bar-fill" style="width: 0%; height: 100%; background: var(--secondary); transition: width 0.3s ease;"></div>
             </div>
           </div>
 
-          <button type="submit" id="upload-submit-btn" class="btn btn-blue" style="width: 100%;">
+          <button type="submit" id="upload-submit-btn" class="btn btn-teal" style="width: 100%;">
             Upload & Analyze Video
           </button>
         </form>
@@ -141,6 +163,7 @@
     import { getActivity } from "./assets/js/activities.js";
     import { startLiveSession, stopLiveSession } from "./assets/js/live.js";
     import { uploadAndAnalyzeVideo } from "./assets/js/upload.js";
+    import { initDebugPanel } from "./assets/js/debug.js";
 
     let activeActivity = null;
 
@@ -148,11 +171,18 @@
       const user = await requireAuth();
       if (!user) return;
 
+      initDebugPanel("debug-panel-container");
+
       const params = new URLSearchParams(window.location.search);
       const activityId = params.get("activity");
+      const cameraError = document.getElementById("camera-error");
 
       activeActivity = getActivity(activityId);
-      if (!activeActivity) {
+      if (!activeActivity || activeActivity.category !== user.role) {
+        if (activeActivity && activeActivity.category !== user.role) {
+          window.location.replace(user.role === "gym" ? "gym.html" : "athlete.html");
+          return;
+        }
         document.getElementById("invalid-activity-card").hidden = false;
         document.getElementById("screening-view").hidden = true;
         return;
@@ -162,42 +192,92 @@
       document.getElementById("activity-title").textContent = activeActivity.label;
       document.getElementById("activity-desc").textContent = activeActivity.description;
       document.getElementById("header-activity-tag").textContent = activeActivity.label.toUpperCase();
+      if (activeActivity.engine !== "squat_analysis") {
+        cameraError.textContent = "Live camera rep analysis currently supports squats. Choose Upload a Video for this movement.";
+        cameraError.hidden = false;
+      }
 
       const instList = document.getElementById("instructions-list");
-      instList.innerHTML = activeActivity.instructions.map(i => `<li>${i}</li>`).join("");
+      instList.innerHTML = activeActivity.instructions.map((i) => `<li>${i}</li>`).join("");
 
-      // Start Live Camera
-      startLiveSession(activityId, handleLiveUpdate);
-
-      // Finish Workout Button
-      document.getElementById("finish-workout-btn").addEventListener("click", () => {
-        const sessionId = stopLiveSession();
-        window.location.href = sessionId ? `report.html?session=${sessionId}` : "report.html";
-      });
-
-      // Tabs Setup
+      const startButton = document.getElementById("start-live-btn");
+      const finishButton = document.getElementById("finish-workout-btn");
       const camTabBtn = document.getElementById("tab-camera-btn");
       const uploadTabBtn = document.getElementById("tab-upload-btn");
+      if (activeActivity.engine !== "squat_analysis") {
+        startButton.disabled = true;
+        startButton.textContent = "Use video upload";
+        document.getElementById("upload-help").textContent =
+          "Uploaded-video analysis currently supports squats only. This activity's video analyzer is not available yet, so the app will not produce a squat report for it.";
+        document.getElementById("upload-submit-btn").disabled = true;
+      }
+
+      startButton.addEventListener("click", async () => {
+        startButton.disabled = true;
+        camTabBtn.disabled = true;
+        uploadTabBtn.disabled = true;
+        startButton.textContent = "Starting camera...";
+        cameraError.hidden = true;
+        try {
+          await startLiveSession(activityId, handleLiveUpdate);
+        } finally {
+          if (!liveSessionStarted) {
+            startButton.disabled = false;
+            startButton.textContent = "Try camera again";
+          }
+          camTabBtn.disabled = false;
+          uploadTabBtn.disabled = false;
+        }
+      });
+
+      // Finish Workout Button
+      finishButton.addEventListener("click", async () => {
+        if (!liveSessionStarted) return;
+        finishButton.disabled = true;
+        cameraError.hidden = true;
+        try {
+          const sessionId = await stopLiveSession();
+          if (!sessionId) throw new Error("No active session was available to finish.");
+          window.location.href = `report.html?session=${encodeURIComponent(sessionId)}`;
+        } catch (error) {
+          cameraError.textContent = `Could not finish the workout: ${error.message}`;
+          cameraError.hidden = false;
+          finishButton.disabled = false;
+        }
+      });
+
+      // Tab Switching
       const camPanel = document.getElementById("tab-camera-panel");
       const uploadPanel = document.getElementById("tab-upload-panel");
 
-      camTabBtn.addEventListener("click", () => {
+      camTabBtn.addEventListener("click", async () => {
         camTabBtn.classList.add("active");
         uploadTabBtn.classList.remove("active");
         camPanel.hidden = false;
         uploadPanel.hidden = true;
-        startLiveSession(activityId, handleLiveUpdate);
       });
 
-      uploadTabBtn.addEventListener("click", () => {
+      uploadTabBtn.addEventListener("click", async () => {
+        if (liveSessionStarted) {
+          try {
+            await stopLiveSession();
+            liveSessionStarted = false;
+            finishButton.disabled = true;
+            startButton.disabled = false;
+            startButton.textContent = "Start camera check";
+          } catch (error) {
+            cameraError.textContent = `Could not end the camera session: ${error.message}`;
+            cameraError.hidden = false;
+            return;
+          }
+        }
         uploadTabBtn.classList.add("active");
         camTabBtn.classList.remove("active");
         uploadPanel.hidden = false;
         camPanel.hidden = true;
-        stopLiveSession();
       });
 
-      // Upload Form Setup
+      // Upload Form
       const uploadForm = document.getElementById("upload-form");
       const fileInput = document.getElementById("video-file-input");
       const uploadErr = document.getElementById("upload-error");
@@ -233,12 +313,29 @@
       });
     }
 
+    let liveSessionStarted = false;
+
     function handleLiveUpdate(update) {
+      const guideOverlay = document.getElementById("framing-guide-overlay");
+
       if (update.error) {
         const errEl = document.getElementById("camera-error");
         errEl.textContent = update.error;
         errEl.hidden = false;
         return;
+      }
+
+      if (update.started) {
+        liveSessionStarted = true;
+        document.getElementById("finish-workout-btn").disabled = false;
+        document.getElementById("start-live-btn").textContent = "Camera check running";
+      }
+
+      if (update.guidance) {
+        guideOverlay.textContent = update.guidance;
+        guideOverlay.style.display = "block";
+      } else {
+        guideOverlay.style.display = "none";
       }
 
       if (update.rep_count !== undefined) {
@@ -250,14 +347,11 @@
       if (update.risk_level) {
         const badge = document.getElementById("hud-risk-badge");
         const r = update.risk_level.toUpperCase();
-        badge.textContent = r === "HIGH" ? "Risky" : (r === "MODERATE" ? "Fix Needed" : "Good Form");
+        badge.textContent = r === "HIGH" ? "High risk" : (r === "MODERATE" ? "Watch your form" : "Good");
         badge.className = `badge ${r === "HIGH" ? "badge-risky" : (r === "MODERATE" ? "badge-fix" : "badge-good")}`;
       }
       if (update.cue) {
         document.getElementById("hud-cue").textContent = update.cue;
-      }
-      if (update.landmarks_ok === false) {
-        document.getElementById("hud-cue").textContent = "Step back so your whole body is visible";
       }
     }
 

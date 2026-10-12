@@ -18,6 +18,9 @@ async def ensure_indexes(database: Any) -> None:
     await database.users.create_index("email", unique=True)
     await database.sessions.create_index([("user_id", 1), ("started_at", -1)])
     await database.reps.create_index("session_id")
+    pose_frames = getattr(database, "pose_frames", None)
+    if pose_frames is not None:
+        await pose_frames.create_index([("session_id", 1), ("timestamp", 1)])
     await database.reports.create_index("session_id", unique=True)
     await database.reports.create_index("user_id")
     await database.chat_messages.create_index([("user_id", 1), ("created_at", -1)])

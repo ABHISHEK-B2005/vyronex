@@ -68,12 +68,16 @@ class RuleBasedRiskEngine:
 
     def assess(self, form_scores: FormScores, features: RepFeatures) -> RiskResult:
         contributions: Dict[str, float] = {}
+        assessed_weight = 0.0
         for category, weight in RISK_WEIGHTS.items():
             form_value = getattr(form_scores, category)
+            if form_value is None:
+                continue
+            assessed_weight += weight
             deficiency = 100.0 - form_value  # how "bad" this category is
             contributions[category] = round(deficiency * weight, 2)
 
-        risk_score = round(sum(contributions.values()), 1)
+        risk_score = round(sum(contributions.values()) / assessed_weight, 1) if assessed_weight else 0.0
         risk_score = max(0.0, min(100.0, risk_score))
         risk_level = classify_risk_score(risk_score)
         risk_label = RISK_LABELS[risk_level]

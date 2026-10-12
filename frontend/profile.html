@@ -20,7 +20,7 @@
           <li><a href="history.html">History</a></li>
           <li><a href="coach.html">Coach</a></li>
           <li><a href="profile.html" class="active">Profile</a></li>
-          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm">Log Out</button></li>
         </ul>
       </nav>
     </div>
@@ -53,7 +53,7 @@
           <input type="text" id="prof-role" disabled style="background: #f4f3ef; color: var(--muted);">
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px;">
+        <div class="responsive-fields">
           <div class="form-group">
             <label for="prof-age">Age</label>
             <input type="number" id="prof-age" name="age" min="13" max="120">
@@ -101,7 +101,7 @@
       <p style="color: var(--muted); font-size: 0.88rem; margin-bottom: 16px;">
         Withdraw training consent and permanently delete all stored movement feature arrays associated with your account.
       </p>
-      <button id="delete-data-btn" class="btn btn-secondary btn-sm" style="color: var(--red-deep); border-color: var(--red);">
+      <button id="delete-data-btn" class="btn btn-secondary btn-sm" style="color: var(--red-deep); border-color: var(--danger);">
         🗑️ Delete My Movement Data & Withdraw Consent
       </button>
     </div>

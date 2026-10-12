@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -15,8 +15,13 @@ class SessionRecord(BaseModel):
     source: Literal["live", "upload"] = "live"
     started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     ended_at: datetime | None = None
+    duration_sec: float | None = Field(default=None, ge=0)
     avg_form_score: float | None = Field(default=None, ge=0, le=100)
     overall_risk: Literal["low", "moderate", "high"] | None = None
+    camera_view: str | None = None
+    tracking_quality: float | None = Field(default=None, ge=0, le=1)
+    low_confidence_frames: int | None = Field(default=None, ge=0)
+    analysis_warning: str | None = None
 
 
 class RepRecord(BaseModel):
@@ -31,8 +36,11 @@ class RepRecord(BaseModel):
     defect_type: str | None = None
     body_area: str | None = None
     risk_level: Literal["LOW", "MODERATE", "HIGH"]
-    form_scores: dict[str, float] = Field(default_factory=dict)
-    features: dict[str, float] = Field(default_factory=dict)
+    form_scores: dict[str, float | None] = Field(default_factory=dict)
+    features: dict[str, Any] = Field(default_factory=dict)
+    alignment: dict = Field(default_factory=dict)
+    camera_view: str | None = None
+    low_confidence: bool = False
     feedback: str = ""
     model_version: str | None = "v1.0.0"
     model_confidence: float | None = 0.85

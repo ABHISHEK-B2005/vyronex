@@ -1,90 +1,63 @@
-# VYRONEX — Frontend Portal
+# VYRONEX Frontend
 
-Plain HTML5, CSS, and vanilla JavaScript (no framework) frontend for the VYRONEX Biomechanical Screening platform.
+Plain HTML, CSS, and JavaScript frontend for home-workout users and athletes. The
+light theme uses Bricolage Grotesque and Figtree with system font fallbacks.
 
----
+## Run locally
 
-## 🎨 Color System & Design Rules
+1. Start the backend in one terminal:
 
-- **White Dominant Theme**: Crisp white cards (`#FFFFFF`) on light paper canvas (`#FAF9F6`) with soft subtle shadows.
-- **Color Variables**:
-  - `--red`: `#D7263D` (Primary buttons, active tabs, risk cues)
-  - `--red-deep`: `#9B1226` (Solid High-Risk badges)
-  - `--yellow`: `#FFC20E` (Highlights, title underlines, top-bar stripe, `#FFE27A` "Fix" badges with `#4A3500` dark text, selected role tint `#FFF8DC`)
-  - `--blue`: `#2B8BE0` (Headings, table headers, secondary buttons, Download PDF button)
-  - `--blue-deep`: `#1B6FBF` (Logo and branding)
-  - `--green`: `#2A9D68` (Correct reps and accuracy stats ONLY)
-- **Typography**: Google Fonts `Bricolage Grotesque` (Headings) and `Figtree` (Body) with system-ui fallbacks.
-- **Labels with Words**: Never uses color alone: every state includes textual labels ("Good", "Fix", "Risky").
-
----
-
-## 📂 Page & Directory Map
-
-```
-frontend/
-├── index.html          # Landing page with pathway selection (Gym vs Athlete)
-├── signup.html         # Signup with role cards, biometrics, opt-in consent toggle, privacy note
-├── login.html          # Clean sign-in page with session storage token handling
-├── gym.html            # Role-protected dashboard (Squat, Push-up, Lunge, Plank) + latest session
-├── athlete.html        # Role-protected dashboard (Long jump, Shot put, Javelin) + latest session
-├── activity.html       # Camera Live screening + Upload video analysis tabs
-├── report.html         # Detailed report: Doughnut, Body Area, Fatigue line chart, rep table, PDF export
-├── history.html        # Longitudinal trend chart, recurring weakness card, filtered session list
-├── coach.html          # Biomechanical AI chat assistant with medical disclaimer & corrective library
-├── profile.html        # Edit biometrics, toggle training consent, delete movement data
-└── assets/
-    ├── css/
-    │   └── style.css   # Full design system tokens and responsive components
-    └── js/
-        ├── auth.js         # JWT token in sessionStorage, apiFetch, escapeHtml
-        ├── guard.js        # Route protection, header navigation, offline banner
-        ├── activities.js   # Single source of truth activity registry
-        ├── live.js         # Camera stream, MediaPipe Pose skeleton, WebSocket cues
-        ├── upload.js       # Multipart video upload & status polling
-        ├── voice.js        # Web Speech API real-time spoken cues
-        ├── charts.js       # Chart.js visualizers (Doughnut, Bar, Fatigue line, Trends)
-        ├── report.js       # Report loading, rep table rendering, PDF export
-        ├── history.js      # History fetching and analytics filters
-        └── coach.js        # AI Coach chat client with typing indicators
-```
-
----
-
-## 🚀 How to Run the Frontend
-
-1. **Start the FastAPI Backend** (in a separate terminal):
-   ```bash
+   ```powershell
    cd backend
    uvicorn app:app --reload --port 8000
    ```
 
-2. **Serve the Frontend**:
-   ```bash
+2. Serve these files in another terminal:
+
+   ```powershell
    cd frontend
    python -m http.server 5500
    ```
 
-3. **Open in Browser**:
-   Navigate to: `http://localhost:5500/index.html` (or `http://localhost:5500/login.html`)
+3. Open `http://localhost:5500/index.html`. Sign in or create an account.
 
----
+The pages check `/api/health` and show a backend-offline banner when the API cannot
+be reached. API requests use the JWT in `sessionStorage` as a Bearer token.
 
-## 📡 Backend API Endpoints Expected
+## Pages and modules
 
-- `GET  /api/health` — Backend liveness check
-- `POST /api/auth/signup` — Account registration (`{name, email, password, role, age, height_cm, weight_kg, data_consent}`)
-- `POST /api/auth/login` — Authentication (`{email, password}`) -> returns `{access_token, role, user}`
-- `GET  /api/auth/me` — Authenticated user profile verification
-- `PUT  /api/auth/profile` — Update biometrics and consent settings
-- `DELETE /api/auth/data` — Delete movement data and withdraw training consent
-- `WS   /ws/live?token=...&activity=...` — Real-time MediaPipe landmarks stream & live coaching cues
-- `POST /api/upload/analyze` — Multipart video file upload
-- `GET  /api/upload/status/{job_id}` — Video processing status polling
-- `GET  /api/reports/{session_id}` — Biomechanical report details & metrics
-- `GET  /api/reports/latest` — Most recent session report
-- `GET  /api/reports/{session_id}/pdf` — Downloadable PDF report export
-- `GET  /api/history?activity=&from_date=&to_date=` — Filtered session history & trend data
-- `POST /api/coach/chat` — Biomechanical chat query (`{message}`) -> returns `{reply, disclaimer}`
-- `GET  /api/coach/recommendations/{session_id}` — Post-workout corrective exercises
-- `POST /api/feedback/rep/{rep_id}` — Rep rating feedback validation
+- `gym.html` and `athlete.html`: role-protected activity dashboards.
+- `activity.html`: camera screening and video-upload tabs. Current analysis supports
+  squats only; other activity uploads are rejected rather than analyzed as squats.
+- `report.html`, `history.html`, `coach.html`, and `profile.html`: reports, session
+  history, coaching, and profile preferences.
+- `assets/js/activities.js`: activity registry.
+- `assets/js/live.js`: camera stream, MediaPipe Pose landmarks, and frame analysis.
+- `assets/js/debug.js`: expandable camera and frame diagnostics.
+
+## API endpoints used
+
+- `GET /api/health`
+- `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/auth/me`
+- `PUT /api/auth/profile`, `DELETE /api/auth/data`
+- `POST /api/session/start`, `POST /api/frame`, `POST /api/session/{session_id}/end`
+- `POST /api/upload/analyze`, `GET /api/upload/status/{job_id}`
+- `GET /api/reports/latest`, `GET /api/reports/{session_id}`,
+  `GET /api/reports/{session_id}/pdf`
+- `GET /api/history`
+- `POST /api/coach/chat`
+
+## Troubleshooting
+
+- Camera access requires `http://localhost` or HTTPS. Allow camera permission when
+  prompted.
+- If the backend is unreachable, start it on port 8000 and allow the frontend origin
+  (`http://localhost:5500`) in FastAPI CORS.
+- Use Python 3.11 or 3.12 for the broadest MediaPipe compatibility. The backend
+  supports both MediaPipe's legacy Pose API and the current Tasks Pose Landmarker;
+  its first upload downloads and caches the official 5.8 MB pose model.
+- Stand 2–3 m from the camera in good light and keep your hips, knees, and ankles
+  visible.
+- If pose assets fail to load, check the internet connection to `cdn.jsdelivr.net`.
+- Use the Camera Check panel on the activity page to inspect pose detection, visible
+  landmarks, frame count, HTTP status, and the latest server response.

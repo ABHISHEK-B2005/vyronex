@@ -1,5 +1,6 @@
 """Unit and integration tests for AI Coach, Report Builder, and PDF Export (Chunks 9 & 10)."""
 
+import asyncio
 import io
 import unittest
 from datetime import datetime, timezone
@@ -139,6 +140,144 @@ class CoachAndReportsTests(unittest.TestCase):
         self.assertTrue("first_half_score" in fatigue)
         self.assertTrue("second_half_score" in fatigue)
         self.assertTrue("drop_pct" in fatigue)
+
+    def test_report_uses_persisted_risk_and_video_duration(self):
+        self.db.sessions_data[self.session_id]["overall_risk"] = "moderate"
+        self.db.sessions_data[self.session_id]["duration_sec"] = 3.4
+        self.db.reps_data = {
+            "rep_1": {
+                "_id": "rep_1",
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "rep_number": 1,
+                "timestamp_sec": 2.58,
+                "status": "defective",
+                "defect_type": "knee_alignment",
+                "body_area": "knee",
+                "risk_level": "MODERATE",
+                "form_scores": {"overall": 55.4},
+                "feedback": "Keep the knee tracking in line with the foot.",
+            },
+        }
+
+        report = asyncio.run(
+            build_report(self.db, self.session_id, self.user_id)
+        )
+
+        self.assertEqual(report["overall_risk"], "MODERATE")
+        self.assertEqual(report["duration_sec"], 3.4)
+
+    def test_report_uses_rep_form_score_threshold(self):
+        self.db.reps_data = {
+            "rep_1": {
+                "_id": "rep_1",
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "rep_number": 1,
+                "timestamp_sec": 1.0,
+                "status": "correct",
+                "risk_level": "LOW",
+                "form_scores": {"overall": 72.0},
+            },
+        }
+
+        report = asyncio.run(build_report(self.db, self.session_id, self.user_id))
+
+        self.assertEqual(report["totals"]["correct"], 1)
+        self.assertEqual(report["totals"]["defective"], 0)
+
+    def test_report_keeps_unassessed_metrics_null(self):
+        self.db.sessions_data[self.session_id]["camera_view"] = "angled"
+        self.db.reps_data = {
+            "rep_1": {
+                "_id": "rep_1",
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "rep_number": 1,
+                "timestamp_sec": 1.0,
+                "status": "correct",
+                "risk_level": "LOW",
+                "camera_view": "angled",
+                "features": {
+                    "knee_alignment": None,
+                    "knee_symmetry": None,
+                    "hip_symmetry": 3.5,
+                },
+                "form_scores": {
+                    "overall": 90.0,
+                    "knee_alignment": None,
+                    "knee_depth": 90.0,
+                    "back_posture": None,
+                    "movement_control": None,
+                    "symmetry": None,
+                },
+            },
+        }
+
+        report = asyncio.run(build_report(self.db, self.session_id, self.user_id))
+
+        self.assertEqual(report["camera_view"], "angled")
+        self.assertIsNone(report["rep_table"][0]["form_scores"]["knee_alignment"])
+        self.assertEqual(
+            report["rep_table"][0]["features"],
+            {
+                "knee_alignment": None,
+                "knee_symmetry": None,
+                "hip_symmetry": 3.5,
+            },
+        )
+        self.assertNotIn("knee_alignment", report["defect_counts"])
+
+    def test_report_includes_alignment_summary_and_unassessed_metrics(self):
+        self.db.reps_data = {
+            "rep_1": {
+                "_id": "rep_1",
+                "session_id": self.session_id,
+                "user_id": self.user_id,
+                "rep_number": 1,
+                "timestamp_sec": 1.0,
+                "status": "correct",
+                "risk_level": "LOW",
+                "camera_view": "front",
+                "alignment": {
+                    "overall": 90.0,
+                    "status": "Good",
+                    "view": "front",
+                    "metrics": [
+                        {
+                            "key": "knee_alignment",
+                            "label": "Knee alignment",
+                            "value": 1.0,
+                            "unit": "% leg length",
+                            "score": 90.0,
+                            "status": "Good",
+                            "assessed": True,
+                            "body_area": "knee",
+                        },
+                        {
+                            "key": "torso_lean",
+                            "label": "Torso lean",
+                            "value": None,
+                            "unit": "degrees",
+                            "score": None,
+                            "status": "Not assessed",
+                            "assessed": False,
+                            "body_area": "lower_back",
+                        },
+                    ],
+                    "issues": [],
+                },
+                "form_scores": {"overall": 90.0},
+            },
+        }
+
+        report = asyncio.run(build_report(self.db, self.session_id, self.user_id))
+
+        self.assertEqual(report["alignment"]["overall"], 90.0)
+        metrics = {metric["key"]: metric for metric in report["alignment"]["metrics"]}
+        self.assertEqual(metrics["knee_alignment"]["score"], 90.0)
+        self.assertIsNone(metrics["torso_lean"]["score"])
+        self.assertFalse(metrics["torso_lean"]["assessed"])
 
     def test_pdf_report_generation(self):
         """Confirm PDF generation produces valid PDF bytes."""

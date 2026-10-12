@@ -42,6 +42,7 @@ from routes.expert import router as expert_router
 from routes.coach import router as coach_router
 from routes.reports import router as reports_router
 from routes.history import router as history_router
+from routes.alignment import router as alignment_router
 from services.session_service import (
     create_session,
     finish_session,
@@ -70,6 +71,7 @@ app.include_router(expert_router)
 app.include_router(coach_router)
 app.include_router(reports_router)
 app.include_router(history_router)
+app.include_router(alignment_router)
 
 # Wide-open CORS: this is a local prototype meant to be hit from a
 # frontend served on a different origin/port (e.g. a local static file
@@ -99,6 +101,9 @@ class LandmarkIn(BaseModel):
     x: float
     y: float
     visibility: float = 1.0
+    z: Optional[float] = None
+    image_x: Optional[float] = None
+    image_y: Optional[float] = None
 
 
 class StartSessionIn(BaseModel):
@@ -109,6 +114,7 @@ class StartSessionIn(BaseModel):
 class FrameIn(BaseModel):
     session_id: str
     landmarks: Dict[str, LandmarkIn]
+    t: Optional[float] = None
 
 
 class StartRingSessionIn(BaseModel):
@@ -141,6 +147,7 @@ def _rep_result_to_dict(rr) -> dict:
         },
         "features": rr.features.to_dict(),
         "checklist": build_checklist(rr.form_scores, rr.features),
+        "alignment": rr.features.alignment,
     }
 
 
@@ -268,12 +275,22 @@ async def process_frame(
         raise HTTPException(404, "Unknown session_id — call /api/session/start first.")
 
     points = {
-        name: LandmarkPoint(x=lm.x, y=lm.y, visibility=lm.visibility)
+        name: LandmarkPoint(
+            x=lm.x,
+            y=lm.y,
+            z=lm.z or 0.0,
+            visibility=lm.visibility,
+            image_x=lm.image_x,
+            image_y=lm.image_y,
+        )
         for name, lm in body.landmarks.items()
     }
-    body_landmarks = BodyLandmarks(points)
+    body_landmarks = BodyLandmarks(
+        points,
+        low_confidence=not all(lm.z is not None for lm in body.landmarks.values()),
+    )
 
-    status = sess["pipeline"].process_frame(body_landmarks)
+    status = sess["pipeline"].process_frame(body_landmarks, body.t)
 
     result: dict = {
         "landmarks_ok": status.landmarks_ok,
@@ -282,6 +299,8 @@ async def process_frame(
         "avg_knee_angle": status.avg_knee_angle,
         "message": status.message,
         "completed_rep": None,
+        "view": status.view,
+        "alignment": status.alignment,
     }
 
     if status.completed_rep is not None:

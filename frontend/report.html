@@ -20,7 +20,7 @@
           <li><a href="javascript:history.back()">Back</a></li>
           <li><a href="history.html">History</a></li>
           <li><a href="coach.html">Coach</a></li>
-          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm">Log Out</button></li>
         </ul>
       </nav>
     </div>
@@ -28,6 +28,9 @@
 
   <main class="main-content">
     <div id="report-error" class="alert-error" role="alert" hidden></div>
+    <div id="report-loading" class="loading-state" role="status" aria-live="polite" hidden>
+      <span class="spinner" aria-hidden="true"></span> Loading your report...
+    </div>
 
     <!-- Header & Action Bar -->
     <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px; margin-bottom: 24px;">
@@ -40,11 +43,13 @@
       </div>
 
       <div>
-        <button id="download-pdf-btn" class="btn btn-blue">
+        <button id="download-pdf-btn" class="btn btn-primary">
           📥 Download PDF Report
         </button>
       </div>
     </div>
+
+    <div id="view-summary" class="info-banner" hidden aria-live="polite"></div>
 
     <!-- Session Comparison Banner -->
     <div id="comparison-banner" class="info-banner" hidden></div>
@@ -59,7 +64,7 @@
         <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Correct Reps</span>
         <div id="stat-correct" style="font-size: 1.8rem; font-weight: 800; color: var(--green); margin-top: 4px;">0</div>
       </div>
-      <div class="card" style="margin-bottom: 0; padding: 18px; text-align: center; border-bottom: 3px solid var(--yellow);">
+      <div class="card" style="margin-bottom: 0; padding: 18px; text-align: center; border-bottom: 3px solid var(--warn);">
         <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Need Fixing</span>
         <div id="stat-defective" style="font-size: 1.8rem; font-weight: 800; color: var(--yellow-badge-text); margin-top: 4px;">0</div>
       </div>
@@ -73,12 +78,12 @@
       </div>
       <div class="card" style="margin-bottom: 0; padding: 18px; text-align: center;">
         <span style="font-size: 0.78rem; color: var(--muted); text-transform: uppercase;">Overall Risk</span>
-        <div style="margin-top: 8px;"><span id="stat-risk-badge" class="badge badge-good">Good Form</span></div>
+        <div style="margin-top: 8px;"><span id="stat-risk-badge" class="badge badge-good">Good</span></div>
       </div>
     </div>
 
     <!-- Visuals Grid: Quality Doughnut & Body Area Breakdown -->
-    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 24px;">
+    <div class="report-chart-grid">
       <div class="card" style="margin-bottom: 0;">
         <h3 class="card-title">Rep Quality Distribution</h3>
         <div style="height: 220px; position: relative;">
@@ -106,11 +111,37 @@
       </div>
     </div>
 
+    <section class="card" aria-labelledby="report-alignment-title">
+      <h2 id="report-alignment-title">Body alignment</h2>
+      <p>Alignment metrics are assessed only when the camera view supports them.</p>
+      <div id="report-alignment-content">
+        <div class="report-alignment-summary">
+          <div id="report-alignment-gauge" class="alignment-gauge"><span id="report-alignment-score">—</span></div>
+          <div><span id="report-alignment-status" class="alignment-status is-unassessed">Not assessed</span>
+            <p id="report-alignment-explanation">No alignment metrics were recorded.</p></div>
+        </div>
+        <h3>Alignment by metric</h3>
+        <div class="table-responsive">
+          <table class="alignment-report-table">
+            <thead><tr><th>Metric</th><th>Value</th><th>Score</th><th>Status</th></tr></thead>
+            <tbody id="report-alignment-metrics"></tbody>
+          </table>
+        </div>
+        <h3 style="margin-top: 18px;">Alignment by rep</h3>
+        <div class="alignment-legend"><span><i class="is-good"></i>Good</span><span><i class="is-watch"></i>Watch</span><span><i class="is-fix"></i>Fix</span><span><i class="is-unassessed"></i>Not assessed</span></div>
+        <div id="report-alignment-strip" class="alignment-strip" role="list" aria-label="Alignment status for each rep"></div>
+        <div class="alignment-dashboard-top">
+          <p id="report-alignment-best">Best rep: Not assessed</p>
+          <p id="report-alignment-worst">Rep to review: Not assessed</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Rep-by-Rep Table with Blue Header -->
     <div class="card" style="padding: 0; overflow: hidden;">
       <div style="padding: 20px 24px; border-bottom: 1px solid var(--line);">
         <h3 style="margin: 0;">Rep-by-Rep Kinematic Log</h3>
-        <p style="color: var(--muted); font-size: 0.88rem; margin-top: 4px;">Click any row to expand the biomechanical explanation.</p>
+        <p style="color: var(--muted); font-size: 0.88rem; margin-top: 4px;">Use each rep's Details button to read its movement explanation.</p>
       </div>
       <div class="table-responsive" style="border: 0; border-radius: 0;">
         <table class="data-table">
@@ -131,7 +162,7 @@
     </div>
 
     <!-- Next Steps & Correctives -->
-    <div class="card" style="border-left: 4px solid var(--yellow);">
+    <div class="card" style="border-left: 4px solid var(--accent);">
       <h3 style="margin-top: 0; color: var(--ink);">💡 Next Steps & Corrective Drills</h3>
       <ul id="recommendations-list" style="padding-left: 20px; color: var(--ink); margin-top: 10px; line-height: 1.7;">
         <!-- Loaded dynamically -->

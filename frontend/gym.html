@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gym & Home Workout Dashboard | VYRONEX</title>
   <link rel="stylesheet" href="assets/css/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <script type="module" src="assets/js/guard.js"></script>
 </head>
 <body>
@@ -20,7 +21,7 @@
           <li><a href="history.html">History</a></li>
           <li><a href="coach.html">Coach</a></li>
           <li><a href="profile.html">Profile</a></li>
-          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm" style="min-height: 36px; padding: 4px 12px;">Log Out</button></li>
+          <li><button id="header-logout-btn" class="btn btn-secondary btn-sm">Log Out</button></li>
         </ul>
       </nav>
     </div>
@@ -31,14 +32,20 @@
     <div style="margin-bottom: 28px;">
       <span class="eyebrow" style="color: var(--muted); font-size: 0.88rem; font-weight: 600;">TRAINING DASHBOARD</span>
       <h1 class="title-accent" style="margin-top: 4px;">Welcome Back, <span id="header-user-name">Athlete</span>!</h1>
-      <p style="color: var(--muted); font-size: 1.05rem; margin-top: 8px;">Select a movement to begin real-time computer vision form screening.</p>
+      <p style="color: var(--muted); font-size: 1.05rem; margin-top: 8px;">Choose a movement to review your form with a camera or uploaded video.</p>
     </div>
+
+    <div id="latest-session-loading" class="loading-state" role="status" aria-live="polite">
+      <span class="spinner" aria-hidden="true"></span> Loading your last session...
+    </div>
+    <div id="latest-session-empty" class="info-banner" hidden>No previous session yet. Complete a workout to see your summary here.</div>
+    <div id="latest-session-error" class="alert-error" role="alert" hidden></div>
 
     <!-- Last Session Summary Card -->
     <div id="latest-session-card" class="card" style="border-left: 5px solid var(--blue); margin-bottom: 32px;" hidden>
       <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 12px;">
         <h3 style="margin: 0; color: var(--blue-deep);">📊 Last Workout Summary</h3>
-        <span id="latest-risk-badge" class="badge badge-good">Good Form</span>
+        <span id="latest-risk-badge" class="badge badge-good">Good</span>
       </div>
       <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 16px; margin: 16px 0;">
         <div>
@@ -51,7 +58,7 @@
         </div>
         <div>
           <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Accuracy</span>
-          <div id="latest-accuracy" style="font-size: 1.2rem; font-weight: 700; color: var(--green);">0%</div>
+          <div id="latest-accuracy" style="font-size: 1.2rem; font-weight: 700; color: var(--heading);">0%</div>
         </div>
         <div>
           <span style="font-size: 0.8rem; color: var(--muted); text-transform: uppercase;">Form Score</span>
@@ -63,10 +70,54 @@
       </div>
     </div>
 
+    <section class="alignment-dashboard card" aria-labelledby="alignment-title">
+      <h2 id="alignment-title">Body alignment</h2>
+      <p>Track the areas assessed during your recent movement checks.</p>
+      <div id="alignment-loading" class="loading-state" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span> Loading your alignment...
+      </div>
+      <div id="alignment-error" class="alert-error" role="alert" hidden></div>
+      <div id="alignment-empty" class="info-banner" hidden>Do a squat in front of the camera to see your alignment.</div>
+      <div id="alignment-not-assessed-note" class="info-banner" hidden>Your last session did not have enough view-supported alignment measurements. Film from the front or side for a full check.</div>
+      <div id="alignment-content" class="alignment-dashboard-content" hidden>
+        <div class="alignment-dashboard-top">
+          <div class="alignment-overview">
+            <div id="dashboard-alignment-gauge" class="alignment-dashboard-gauge">
+              <span><strong id="dashboard-alignment-score">—</strong><small>/100</small></span>
+            </div>
+            <div><span id="dashboard-alignment-status" class="alignment-status">Not assessed</span><p id="dashboard-alignment-change"></p></div>
+          </div>
+          <div class="body-map-card">
+            <h3>Alignment body map</h3>
+            <svg id="alignment-body-map" viewBox="0 0 180 260" role="img" aria-label="Front body map showing assessed alignment areas">
+              <circle cx="90" cy="23" r="16" class="body-map-part is-unassessed" data-area="shoulder" />
+              <path d="M64 52 Q90 42 116 52 L110 114 Q90 126 70 114 Z" class="body-map-part is-unassessed" data-area="lower_back" />
+              <path d="M64 56 L39 112 L48 116 L75 70 M116 56 L141 112 L132 116 L105 70" class="body-map-limb body-map-part is-unassessed" data-area="shoulder" />
+              <path d="M74 116 L65 178 L60 232 M106 116 L115 178 L120 232" class="body-map-limb body-map-part is-unassessed" data-area="hip" />
+              <circle cx="65" cy="177" r="9" class="body-map-part is-unassessed" data-area="knee" />
+              <circle cx="115" cy="177" r="9" class="body-map-part is-unassessed" data-area="knee" />
+              <circle cx="60" cy="232" r="8" class="body-map-part is-unassessed" data-area="ankle" />
+              <circle cx="120" cy="232" r="8" class="body-map-part is-unassessed" data-area="ankle" />
+            </svg>
+            <div class="alignment-legend"><span><i class="is-good"></i>Good</span><span><i class="is-watch"></i>Watch</span><span><i class="is-fix"></i>Fix</span><span><i class="is-unassessed"></i>Not assessed</span></div>
+            <p>Most frequent: <strong id="alignment-focus-fault">—</strong></p>
+          </div>
+          <div class="card alignment-focus-card">
+            <h3>Focus this week</h3>
+            <p id="alignment-focus-tip">Loading your focus...</p>
+          </div>
+        </div>
+        <div class="alignment-chart-grid">
+          <div class="card"><h3>Last 30 days</h3><div class="alignment-chart"><canvas id="alignment-trend-chart"></canvas><p id="alignment-trend-empty" hidden></p></div></div>
+          <div class="card"><h3>Misalignments by area</h3><div class="alignment-chart"><canvas id="alignment-area-chart"></canvas><p id="alignment-area-empty" hidden></p></div></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Activities Grid -->
     <div>
       <h2 style="margin-bottom: 4px;">Choose an Exercise</h2>
-      <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 16px;">Real-time audio feedback with camera or video upload analysis.</p>
+      <p style="color: var(--muted); font-size: 0.95rem; margin-bottom: 16px;">Use a front-facing camera check or upload a squat video for analysis. Other movement analyzers are not available yet.</p>
 
       <div class="activity-grid" id="activities-container">
         <!-- Rendered dynamically from activities.js -->
@@ -78,10 +129,12 @@
     import { requireAuth } from "./assets/js/guard.js";
     import { getActivitiesByCategory } from "./assets/js/activities.js";
     import { apiFetch, escapeHtml } from "./assets/js/auth.js";
+    import { loadAlignmentDashboard } from "./assets/js/alignment-dashboard.js";
 
     async function init() {
       const user = await requireAuth("gym");
       if (!user) return;
+      void loadAlignmentDashboard();
 
       // Render Gym Activities
       const activities = getActivitiesByCategory("gym");
@@ -100,6 +153,9 @@
       `).join("");
 
       // Fetch Latest Session
+      const loading = document.getElementById("latest-session-loading");
+      const empty = document.getElementById("latest-session-empty");
+      const error = document.getElementById("latest-session-error");
       try {
         const res = await apiFetch("/api/reports/latest");
         const report = await res.json();
@@ -111,14 +167,20 @@
 
           const risk = (report.overall_risk || "LOW").toUpperCase();
           const riskEl = document.getElementById("latest-risk-badge");
-          riskEl.textContent = risk === "HIGH" ? "Risky" : (risk === "MODERATE" ? "Fix Needed" : "Good Form");
+          riskEl.textContent = risk === "HIGH" ? "High risk" : (risk === "MODERATE" ? "Watch your form" : "Good");
           riskEl.className = `badge ${risk === "HIGH" ? "badge-risky" : (risk === "MODERATE" ? "badge-fix" : "badge-good")}`;
 
-          document.getElementById("latest-report-link").href = `report.html?session=${report.session_id}`;
+          document.getElementById("latest-report-link").href = `report.html?session=${encodeURIComponent(report.session_id)}`;
           document.getElementById("latest-session-card").hidden = false;
         }
-      } catch {
-        // No prior sessions recorded yet
+      } catch (err) {
+        if (err.status === 404) empty.hidden = false;
+        else {
+          error.textContent = `Could not load your last session: ${err.message}`;
+          error.hidden = false;
+        }
+      } finally {
+        loading.hidden = true;
       }
     }
 

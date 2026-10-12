@@ -16,11 +16,12 @@ from enum import Enum
 from typing import List, Optional
 
 from src.config import (
-    ASCEND_TRIGGER_DELTA,
-    BOTTOM_KNEE_ANGLE,
-    DESCEND_TRIGGER_DELTA,
     MIN_FRAMES_IN_PHASE,
-    STANDING_KNEE_ANGLE,
+    MIN_REP_DURATION_SECONDS,
+    MIN_REP_SAMPLES,
+    SQUAT_DESCENT_START_ANGLE,
+    SQUAT_DOWN_ANGLE,
+    SQUAT_UP_ANGLE,
 )
 
 
@@ -46,6 +47,9 @@ class RepFrameSample:
     torso_angle: float
     knee_alignment_shift: float  # normalized inward/outward knee shift
     hip_midpoint: tuple
+    camera_view: str = "front"
+    low_confidence: bool = False
+    alignment: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -77,7 +81,6 @@ class SquatDetector:
         self._current_rep_samples: List[RepFrameSample] = []
         self._current_rep_start_time: Optional[float] = None
         self._reached_bottom_this_rep: bool = False
-        self._peak_standing_angle: float = STANDING_KNEE_ANGLE
 
     def reset(self) -> None:
         self.__init__()
@@ -103,6 +106,36 @@ class SquatDetector:
             self._candidate_phase = None
             self._frames_in_candidate_phase = 0
 
+    def finalize_current_rep(self, timestamp: Optional[float] = None) -> Optional[CompletedRep]:
+        """Count a valid in-progress rep when a clip ends before standing is reached."""
+        if self._current_rep_start_time is None or not self._current_rep_samples:
+            return None
+
+        end_time = timestamp if timestamp is not None else self._current_rep_samples[-1].timestamp
+        duration = end_time - self._current_rep_start_time
+        if duration < MIN_REP_DURATION_SECONDS:
+            self._current_rep_samples = []
+            self._current_rep_start_time = None
+            self._reached_bottom_this_rep = False
+            return None
+        if not self._reached_bottom_this_rep:
+            self._current_rep_samples = []
+            self._current_rep_start_time = None
+            self._reached_bottom_this_rep = False
+            return None
+
+        self.rep_count += 1
+        completed_rep = CompletedRep(
+            rep_number=self.rep_count,
+            samples=list(self._current_rep_samples),
+            start_time=self._current_rep_start_time,
+            end_time=end_time,
+        )
+        self._current_rep_samples = []
+        self._current_rep_start_time = None
+        self._reached_bottom_this_rep = False
+        return completed_rep
+
     def update(self, sample: RepFrameSample) -> Optional[CompletedRep]:
         """Feed one frame of measurements. Returns a CompletedRep if this
         frame completed a repetition, otherwise None.
@@ -111,9 +144,9 @@ class SquatDetector:
         completed_rep: Optional[CompletedRep] = None
 
         # Determine the "raw" phase suggested purely by the current angle.
-        if angle >= STANDING_KNEE_ANGLE:
+        if angle >= SQUAT_UP_ANGLE:
             raw_phase = SquatPhase.STANDING
-        elif angle <= BOTTOM_KNEE_ANGLE:
+        elif angle <= SQUAT_DOWN_ANGLE:
             raw_phase = SquatPhase.BOTTOM
         elif self.phase in (SquatPhase.STANDING, SquatPhase.DESCENDING):
             raw_phase = SquatPhase.DESCENDING
@@ -121,35 +154,47 @@ class SquatDetector:
             raw_phase = SquatPhase.ASCENDING
 
         previous_phase = self.phase
+        if (
+            self.phase == SquatPhase.STANDING
+            and angle < SQUAT_DESCENT_START_ANGLE
+            and self._current_rep_start_time is None
+        ):
+            self._current_rep_start_time = sample.timestamp
+            self._current_rep_samples = []
+            self._reached_bottom_this_rep = False
         self._set_phase(raw_phase)
 
         # Track rep lifecycle
-        if self.phase == SquatPhase.DESCENDING and previous_phase == SquatPhase.STANDING:
-            self._current_rep_samples = []
-            self._current_rep_start_time = sample.timestamp
-            self._reached_bottom_this_rep = False
-
         if self.phase in (SquatPhase.DESCENDING, SquatPhase.BOTTOM, SquatPhase.ASCENDING):
             self._current_rep_samples.append(sample)
 
         if self.phase == SquatPhase.BOTTOM:
             self._reached_bottom_this_rep = True
-
         if (
             self.phase == SquatPhase.STANDING
             and previous_phase == SquatPhase.ASCENDING
             and self._reached_bottom_this_rep
             and self._current_rep_start_time is not None
         ):
-            self.rep_count += 1
-            completed_rep = CompletedRep(
-                rep_number=self.rep_count,
-                samples=list(self._current_rep_samples),
-                start_time=self._current_rep_start_time,
-                end_time=sample.timestamp,
-            )
+            duration = sample.timestamp - self._current_rep_start_time
+            if duration >= MIN_REP_DURATION_SECONDS and len(self._current_rep_samples) >= MIN_REP_SAMPLES:
+                self.rep_count += 1
+                completed_rep = CompletedRep(
+                    rep_number=self.rep_count,
+                    samples=list(self._current_rep_samples),
+                    start_time=self._current_rep_start_time,
+                    end_time=sample.timestamp,
+                )
             self._current_rep_samples = []
             self._current_rep_start_time = None
             self._reached_bottom_this_rep = False
+        elif (
+            self.phase == SquatPhase.STANDING
+            and previous_phase == SquatPhase.STANDING
+            and raw_phase == SquatPhase.STANDING
+            and not self._reached_bottom_this_rep
+        ):
+            self._current_rep_samples = []
+            self._current_rep_start_time = None
 
         return completed_rep

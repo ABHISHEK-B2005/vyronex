@@ -11,9 +11,6 @@ from models.session import RepRecord, SessionRecord
 from src.config import DEFECT_BODY_AREA_MAP, REP_FORM_SCORE_CORRECT_MIN
 
 
-_RISK_SEVERITY = {"low": 0, "moderate": 1, "high": 2}
-
-
 def get_body_area(defect_type: str | None) -> str | None:
     if not defect_type:
         return None
@@ -120,6 +117,9 @@ async def record_completed_rep(
     features = result.get("features", {})
     if not isinstance(features, dict):
         features = {}
+    alignment = result.get("alignment") or features.get("alignment") or {}
+    if not isinstance(alignment, dict):
+        alignment = {}
     status = classify_rep_status(risk_level, form_scores)
 
     feedback_raw = result.get("feedback", "")
@@ -159,6 +159,13 @@ async def record_completed_rep(
         risk_level=str(risk_level).upper(),
         form_scores=form_scores,
         features=stored_features,
+        alignment=alignment,
+        camera_view=(
+            result.get("camera_view")
+            or alignment.get("view")
+            or features.get("camera_view")
+        ),
+        low_confidence=bool(result.get("low_confidence", False)),
         feedback=feedback_text,
         model_version=str(model_version) if model_version else "v1.0.0",
         model_confidence=float(model_confidence) if model_confidence is not None else 0.85,
@@ -193,10 +200,10 @@ async def finish_session(
             risk_counts[risk_level] += 1
 
     avg_form_score = round(sum(form_scores) / len(form_scores), 1) if form_scores else None
-    overall_risk = max(
-        risk_counts,
-        key=lambda level: (risk_counts[level], _RISK_SEVERITY[level]),
-    ) if total_reps else None
+    overall_risk = next(
+        (risk for risk in ("high", "moderate", "low") if risk_counts[risk]),
+        None,
+    )
 
     ended_at = datetime.now(timezone.utc)
     overall_risk_val = overall_risk.lower() if overall_risk else None
@@ -208,13 +215,29 @@ async def finish_session(
         "moderate_risk_reps": risk_counts["moderate"],
         "high_risk_reps": risk_counts["high"],
     })
+    if not finalized_summary.get("camera_view"):
+        view_counts = Counter(
+            rep.get("camera_view") for rep in reps if rep.get("camera_view")
+        )
+        if view_counts:
+            finalized_summary["camera_view"] = view_counts.most_common(1)[0][0]
+    duration_seconds = finalized_summary.get("duration_seconds")
+    if not isinstance(duration_seconds, (int, float)) or not isfinite(duration_seconds) or duration_seconds < 0:
+        duration_seconds = None
 
     await database.sessions.update_one(
         {"_id": session_id, "user_id": user_id},
         {"$set": {
             "ended_at": ended_at,
+            **({"duration_sec": float(duration_seconds)} if duration_seconds is not None else {}),
             "avg_form_score": avg_form_score,
             "overall_risk": overall_risk_val,
+            **({
+                "camera_view": finalized_summary["camera_view"],
+                "tracking_quality": finalized_summary.get("tracking_quality"),
+                "low_confidence_frames": finalized_summary.get("low_confidence_frames"),
+                "analysis_warning": finalized_summary.get("analysis_warning"),
+            } if "camera_view" in finalized_summary else {}),
         }},
     )
 
@@ -267,11 +290,11 @@ async def get_session_summary(database: Any, user_id: str, session_id: str) -> d
 
     started_at = session.get("started_at")
     ended_at = session.get("ended_at") or datetime.now(timezone.utc)
-    duration_seconds = 0.0
+    duration_seconds = float(session.get("duration_sec") or 0.0)
     start_time_ts = 0.0
     if started_at and hasattr(started_at, "timestamp"):
         start_time_ts = started_at.timestamp()
-        if ended_at and hasattr(ended_at, "timestamp"):
+        if duration_seconds == 0.0 and ended_at and hasattr(ended_at, "timestamp"):
             duration_seconds = round(max(0.0, ended_at.timestamp() - start_time_ts), 1)
 
     return {

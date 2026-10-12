@@ -12,7 +12,7 @@ import numpy as np
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from core.deps import get_current_user_optional
+from core.deps import get_current_user, get_current_user_optional
 from routes.upload import _jobs, router as upload_router
 from src.demo_mode import build_demo_sequence
 
@@ -45,8 +45,14 @@ class FakeCollection:
                 return doc
         return None
 
-    def find(self, query):
+    def find(self, query, projection=None):
         matched = [doc for doc in self.documents if all(doc.get(k) == v for k, v in query.items())]
+        if projection:
+            included = {key for key, enabled in projection.items() if enabled}
+            matched = [
+                {key: value for key, value in doc.items() if key in included}
+                for doc in matched
+            ]
 
         class FakeCursor:
             def __init__(self, items):
@@ -54,6 +60,10 @@ class FakeCollection:
 
             async def to_list(self, length=1000):
                 return list(self.items[:length])
+
+            def sort(self, key, direction=1):
+                self.items.sort(key=lambda item: item.get(key, 0), reverse=direction < 0)
+                return self
 
         return FakeCursor(matched)
 
@@ -83,11 +93,13 @@ class UploadRouteTests(unittest.TestCase):
             sessions=FakeCollection(),
             reps=FakeCollection(),
             reports=FakeCollection(),
+            pose_frames=FakeCollection(),
         )
         self.app = FastAPI()
         self.app.state.database = self.database
         self.app.include_router(upload_router)
         self.app.dependency_overrides[get_current_user_optional] = lambda: {"_id": "test-user-1", "role": "gym"}
+        self.app.dependency_overrides[get_current_user] = lambda: {"_id": "test-user-1", "role": "gym"}
         self.client = TestClient(self.app)
 
     def test_upload_pdf_rejected_with_415(self):
@@ -109,9 +121,47 @@ class UploadRouteTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 415)
 
+    def test_non_squat_upload_is_rejected_instead_of_scored_as_a_squat(self):
+        response = self.client.post(
+            "/api/upload/analyze",
+            files={"file": ("jump.mp4", b"not processed", "video/mp4")},
+            data={"activity": "long_jump"},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertIn("supports squats only", response.json()["detail"])
+
     def test_upload_status_unknown_job_returns_404(self):
         response = self.client.get("/api/upload/status/unknown-job-id-999")
         self.assertEqual(response.status_code, 404)
+
+    def test_debug_endpoint_returns_json_and_csv_rows(self):
+        session_id = "debug-session"
+        self.database.sessions.documents.append({
+            "_id": session_id,
+            "user_id": "test-user-1",
+        })
+        self.database.pose_frames.documents.append({
+            "session_id": session_id,
+            "timestamp": 0.1,
+            "knee_angle": 120.0,
+            "torso_angle": 80.0,
+            "view": "front",
+            "visibility": 1.0,
+            "usable": True,
+            "tracking_error": False,
+            "rep_phase": "Descending",
+            "landmarks": {"nose": {"x": 0.1}},
+        })
+
+        json_response = self.client.get(f"/api/upload/debug/{session_id}")
+        csv_response = self.client.get(f"/api/upload/debug/{session_id}?format=csv")
+
+        self.assertEqual(json_response.status_code, 200)
+        self.assertEqual(len(json_response.json()["frames"]), 1)
+        self.assertNotIn("landmarks", json_response.json()["frames"][0])
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertIn("timestamp,knee_angle,torso_angle", csv_response.text)
 
     def test_upload_clip_with_no_person_reports_clean_error(self):
         video_bytes = _generate_mp4_bytes(num_frames=30, fps=30.0)
@@ -131,7 +181,10 @@ class UploadRouteTests(unittest.TestCase):
         self.assertEqual(status_res.status_code, 200)
         status_data = status_res.json()
         self.assertEqual(status_data["status"], "failed")
-        self.assertIn("No person detected", status_data["error"])
+        self.assertIn(
+            "We could not track you reliably",
+            status_data["error"],
+        )
 
     def test_upload_20_second_squat_clip_completes_and_returns_session(self):
         # 600 frames at 30 fps = 20 seconds

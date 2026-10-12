@@ -163,7 +163,7 @@ def generate_pdf_report(
     # 2. Executive Summary Metrics Table
     totals = report_data.get("totals", {})
     acc_pct = report_data.get("accuracy_pct", 100)
-    avg_score = report_data.get("avg_form_score", 85)
+    avg_score = report_data.get("avg_form_score")
     overall_risk = str(report_data.get("overall_risk", "LOW")).upper()
 
     risk_bg = colors.HexColor("#dcfce7") if overall_risk == "LOW" else (
@@ -189,7 +189,10 @@ def generate_pdf_report(
             Paragraph(f"<font color='#d97706'><b>{totals.get('defective', 0)}</b></font>", body_text),
             Paragraph(f"<font color='#dc2626'><b>{totals.get('high_risk', 0)}</b></font>", body_text),
             Paragraph(f"<b>{acc_pct}%</b>", body_text),
-            Paragraph(f"<b>{avg_score} / 100</b>", body_text),
+            Paragraph(
+                f"<b>{avg_score} / 100</b>" if avg_score is not None else "<b>Not assessed</b>",
+                body_text,
+            ),
             Paragraph(f"<b><font color='{risk_tc.hexval()}'>{overall_risk}</font></b>", bold_text),
         ],
     ]
@@ -212,6 +215,54 @@ def generate_pdf_report(
     body_areas = report_data.get("body_area_breakdown", {})
     chart_buf = _render_body_area_chart(body_areas)
     story.append(Image(chart_buf, width=480, height=135))
+    story.append(Spacer(1, 10))
+
+    alignment = report_data.get("alignment", {})
+    story.append(Paragraph("Body Alignment", section_heading))
+    overall_alignment = alignment.get("overall")
+    alignment_status_text = alignment.get("status", "Not assessed")
+    story.append(Paragraph(
+        f"<b>Overall alignment:</b> {overall_alignment}/100 ({alignment_status_text})"
+        if overall_alignment is not None
+        else "<b>Overall alignment:</b> Not assessed",
+        body_text,
+    ))
+    alignment_rows = [[
+        Paragraph("<b>Metric</b>", bold_text),
+        Paragraph("<b>Value</b>", bold_text),
+        Paragraph("<b>Score</b>", bold_text),
+        Paragraph("<b>Status</b>", bold_text),
+    ]]
+    for metric in alignment.get("metrics", []):
+        value = metric.get("value")
+        formatted = (
+            f"{value} {metric.get('unit', '')}".strip()
+            if metric.get("assessed") and value is not None
+            else "Not assessed from this angle"
+        )
+        score = (
+            f"{metric['score']}/100"
+            if metric.get("assessed") and metric.get("score") is not None
+            else "—"
+        )
+        alignment_rows.append([
+            Paragraph(str(metric.get("label", metric.get("key", "Metric"))), body_text),
+            Paragraph(formatted, body_text),
+            Paragraph(score, body_text),
+            Paragraph(str(metric.get("status", "Not assessed")), body_text),
+        ])
+    if len(alignment_rows) > 1:
+        alignment_table = Table(alignment_rows, colWidths=[190, 145, 80, 100], repeatRows=1)
+        alignment_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eaf2fb")),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        story.append(alignment_table)
+    else:
+        story.append(Paragraph("No alignment metrics were assessed for this session.", body_text))
     story.append(Spacer(1, 10))
 
     # 4. Fatigue & Trend Analysis
@@ -261,7 +312,10 @@ def generate_pdf_report(
             Paragraph(str(r.get("problem", "None"))[:28], body_text),
             Paragraph(str(r.get("body_area", "general")).replace("_", " ").title(), body_text),
             Paragraph(r_risk, bold_text),
-            Paragraph(f"{r.get('form_score', 80)}", body_text),
+            Paragraph(
+                str(r["form_score"]) if r.get("form_score") is not None else "Not assessed",
+                body_text,
+            ),
         ])
 
     t_reps = Table(table_rows, colWidths=[40, 50, 80, 150, 80, 60, 60])

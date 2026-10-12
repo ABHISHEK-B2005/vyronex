@@ -37,6 +37,7 @@ def _serialize_rep(result: RepResult, rep_number: int) -> dict[str, Any]:
             "all_issues": result.feedback.all_issues,
         },
         "features": result.features.to_dict(),
+        "alignment": result.features.alignment,
     }
 
 
@@ -58,27 +59,39 @@ def _parse_frame(payload: Any) -> tuple[BodyLandmarks | None, float] | None:
         return None
 
     points: dict[str, LandmarkPoint] = {}
+    optional_landmarks = {"left_foot_index", "right_foot_index"}
     for name in MEDIAPIPE_INDEX_MAP:
         raw_point = raw_landmarks.get(name)
+        if raw_point is None and name in optional_landmarks:
+            continue
         if not isinstance(raw_point, dict):
             return None
         values = (
             raw_point.get("x"),
             raw_point.get("y"),
             raw_point.get("visibility", 1.0),
+            raw_point.get("z"),
         )
         if any(
             isinstance(value, bool)
             or not isinstance(value, (int, float))
             or not math.isfinite(value)
-            for value in values
+            for value in values[:3]
         ):
             return None
-        x, y, visibility = values
+        x, y, visibility, z = values
         if not 0.0 <= visibility <= 1.0:
             return None
-        points[name] = LandmarkPoint(float(x), float(y), float(visibility))
-    return BodyLandmarks(points), float(timestamp)
+        if z is not None and (
+            isinstance(z, bool) or not isinstance(z, (int, float)) or not math.isfinite(z)
+        ):
+            return None
+        points[name] = LandmarkPoint(
+            float(x), float(y), float(visibility), float(z or 0.0),
+            raw_point.get("image_x"), raw_point.get("image_y"),
+        )
+    low_confidence = any(raw_landmarks[name].get("z") is None for name in MEDIAPIPE_INDEX_MAP if name not in optional_landmarks)
+    return BodyLandmarks(points, low_confidence=low_confidence), float(timestamp)
 
 
 async def _authenticate(websocket: WebSocket) -> dict | None:
@@ -152,6 +165,8 @@ async def live_analysis(websocket: WebSocket) -> None:
             "risk_level": latest_risk_level,
             "risk_score": latest_risk_score,
             "cue": latest_cue,
+            "view": "unknown",
+            "alignment": None,
         })
 
         while True:
@@ -204,6 +219,8 @@ async def live_analysis(websocket: WebSocket) -> None:
                 "message": None if visible else "Step back so your full body is visible",
                 "landmarks_ok": visible,
                 "completed_rep": rep_payload,
+                "view": status.view,
+                "alignment": status.alignment,
             })
     except WebSocketDisconnect:
         pass
